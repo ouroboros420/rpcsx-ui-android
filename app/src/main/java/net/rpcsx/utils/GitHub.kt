@@ -114,13 +114,18 @@ object GitHub {
 
     suspend fun fetchLatestRelease(repoUrl: String): FetchResult = withContext(Dispatchers.IO) {
         val repoPath = repoUrl.removePrefix(server)
-        val apiUrl = "${apiServer}repos/$repoPath/releases/latest"
+        // Use the list endpoint (newest first) and take the first release, rather
+        // than /releases/latest which excludes pre-releases. This fork publishes
+        // builds as pre-releases, so /latest would otherwise find nothing.
+        val apiUrl = "${apiServer}repos/$repoPath/releases"
 
         when (val response = get(apiUrl)) {
             is GetResult.Error -> FetchResult.Error("Failed to fetch release: ${response.code} ${response.message}")
             is GetResult.Success -> {
                 try {
-                    FetchResult.Success(json.decodeFromString(Release.serializer(), response.content))
+                    val releases: List<Release> = json.decodeFromString(ListSerializer(Release.serializer()), response.content)
+                    releases.firstOrNull()?.let { FetchResult.Success(it) }
+                        ?: FetchResult.Error("No releases found")
                 } catch (e: Exception) {
                     FetchResult.Error("Parsing error: ${e.message}")
                 }
