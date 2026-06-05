@@ -43,6 +43,8 @@ object GitHub {
     @Serializable
     data class Release(
         val name: String,
+        val created_at: String = "",
+        val published_at: String? = null,
         val assets: List<Asset> = emptyList()
     )
 
@@ -114,9 +116,10 @@ object GitHub {
 
     suspend fun fetchLatestRelease(repoUrl: String): FetchResult = withContext(Dispatchers.IO) {
         val repoPath = repoUrl.removePrefix(server)
-        // Use the list endpoint (newest first) and take the first release, rather
-        // than /releases/latest which excludes pre-releases. This fork publishes
-        // builds as pre-releases, so /latest would otherwise find nothing.
+        // Use the list endpoint rather than /releases/latest (which excludes
+        // pre-releases) so this fork's builds are visible. The list is NOT
+        // reliably newest-first, so pick the most recent by timestamp instead of
+        // blindly taking the first entry (which can serve an older build).
         val apiUrl = "${apiServer}repos/$repoPath/releases"
 
         when (val response = get(apiUrl)) {
@@ -124,7 +127,8 @@ object GitHub {
             is GetResult.Success -> {
                 try {
                     val releases: List<Release> = json.decodeFromString(ListSerializer(Release.serializer()), response.content)
-                    releases.firstOrNull()?.let { FetchResult.Success(it) }
+                    // ISO-8601 timestamps sort lexicographically; prefer published_at, fall back to created_at.
+                    releases.maxByOrNull { it.published_at ?: it.created_at }?.let { FetchResult.Success(it) }
                         ?: FetchResult.Error("No releases found")
                 } catch (e: Exception) {
                     FetchResult.Error("Parsing error: ${e.message}")
@@ -142,10 +146,13 @@ object GitHub {
             is GetResult.Success -> {
                 try {
                     val releases: List<Release> = json.decodeFromString(ListSerializer(Release.serializer()), response.content)
-                    val drivers = releases.map { release ->
-                        val assetUrl = release.assets.firstOrNull()?.browser_download_url
-                        release.name to assetUrl
-                    }
+                    // Sort newest-first; GitHub's list order is not reliable.
+                    val drivers = releases
+                        .sortedByDescending { it.published_at ?: it.created_at }
+                        .map { release ->
+                            val assetUrl = release.assets.firstOrNull()?.browser_download_url
+                            release.name to assetUrl
+                        }
                     FetchResult.Success(drivers)
                 } catch (e: Exception) {
                     FetchResult.Error("Parsing error: ${e.message}")
