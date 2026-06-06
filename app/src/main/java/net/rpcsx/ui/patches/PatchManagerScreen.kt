@@ -210,7 +210,12 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
                                     PatchRepository.setEnabled(patch, enabled)
                                 }
                                 if (ok) {
-                                    patches = withContext(Dispatchers.IO) { PatchRepository.list() }
+                                    // Update just this row instead of re-parsing the
+                                    // whole 850 KB patch set on every toggle.
+                                    patches = patches.map {
+                                        if (it.hash == patch.hash && it.name == patch.name)
+                                            it.copy(enabled = enabled) else it
+                                    }
                                 } else {
                                     Toast.makeText(context, "Could not change patch", Toast.LENGTH_SHORT).show()
                                 }
