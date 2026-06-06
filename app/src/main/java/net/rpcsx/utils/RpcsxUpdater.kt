@@ -15,6 +15,18 @@ import kotlin.system.exitProcess
 
 
 object RpcsxUpdater {
+    // The core embeds build decorations after the CalVer date-time: " Draft"/" RC"
+    // for untagged/pre-release builds (with an optional tag number) and a trailing
+    // "+" when built from a dirty tree, e.g. "2026.06.06-1436 Draft+". Strip them so
+    // an installed build compares equal to its clean release tag. The old code used
+    // removeSuffix(" Draft"), which could not strip "Draft+" (the string ends in '+',
+    // not " Draft"), so the updater kept re-offering the version already installed.
+    private fun normalizeVersion(raw: String): String =
+        raw.trim()
+            .replace(Regex("\\s*(Draft|RC|Release)\\s*\\d*"), "")
+            .replace("+", "")
+            .trim()
+
     fun getCurrentVersion(): String? {
         if (RPCSX.activeLibrary.value == null) {
             return null
@@ -24,7 +36,7 @@ object RpcsxUpdater {
         // (e.g. a side-loaded library whose filename doesn't encode it),
         // otherwise the version would read "...-null".
         val arch = GeneralSettings["rpcsx_installed_arch"] as? String ?: getArch()
-        return "v" + RPCSX.instance.getVersion().trim().removeSuffix(" Draft").trim() + "-" + arch
+        return "v" + normalizeVersion(RPCSX.instance.getVersion()) + "-" + arch
     }
 
     fun getFileArch(file: File): String? {
@@ -71,7 +83,9 @@ object RpcsxUpdater {
         when (val fetchResult = GitHub.fetchLatestRelease(url)) {
             is GitHub.FetchResult.Success<*> -> {
                 val release = fetchResult.content as GitHub.Release
-                val releaseVersion = "${release.name}-${arch}"
+                // Normalize the tag the same way as the installed version so a clean
+                // release tag and a "Draft+"-decorated local build compare equal.
+                val releaseVersion = "v" + normalizeVersion(release.name.removePrefix("v")) + "-" + arch
 
                 if (release.assets.find { it.name == "librpcsx-android-${getAbi()}-${arch}.so" }?.browser_download_url == null) {
                     return null
@@ -100,7 +114,7 @@ object RpcsxUpdater {
         when (val fetchResult = GitHub.fetchLatestRelease(url)) {
             is GitHub.FetchResult.Success<*> -> {
                 val release = fetchResult.content as GitHub.Release
-                val releaseVersion = "${release.name}-${arch}"
+                val releaseVersion = "v" + normalizeVersion(release.name.removePrefix("v")) + "-" + arch
                 val releaseAsset = release.assets.find { it.name == "librpcsx-android-${getAbi()}-$arch.so" }
 
                 if (releaseVersion != getCurrentVersion() && releaseAsset?.browser_download_url != null) {
