@@ -47,6 +47,12 @@ struct RPCSXApi {
   std::string (*patchEngineVersion)();
   std::string (*patchesList)();
   bool (*patchSetEnabled)(std::string_view hash, std::string_view description, bool enabled);
+  bool (*customConfigExists)(std::string_view serial);
+  bool (*customConfigCreate)(std::string_view serial);
+  bool (*customConfigDelete)(std::string_view serial);
+  std::string (*customConfigGet)(std::string_view serial, std::string_view path);
+  bool (*customConfigSet)(std::string_view serial, std::string_view path, std::string_view valueString);
+  bool (*customConfigImport)(std::string_view serial, std::string_view yaml);
   void *(*setCustomDriver)(void *driverHandle);
 };
 
@@ -112,6 +118,12 @@ struct RPCSXLibrary : RPCSXApi {
     result.patchEngineVersion = reinterpret_cast<decltype(patchEngineVersion)>(dlsym(handle, "_rpcsx_patchEngineVersion"));
     result.patchesList = reinterpret_cast<decltype(patchesList)>(dlsym(handle, "_rpcsx_patchesList"));
     result.patchSetEnabled = reinterpret_cast<decltype(patchSetEnabled)>(dlsym(handle, "_rpcsx_patchSetEnabled"));
+    result.customConfigExists = reinterpret_cast<decltype(customConfigExists)>(dlsym(handle, "_rpcsx_customConfigExists"));
+    result.customConfigCreate = reinterpret_cast<decltype(customConfigCreate)>(dlsym(handle, "_rpcsx_customConfigCreate"));
+    result.customConfigDelete = reinterpret_cast<decltype(customConfigDelete)>(dlsym(handle, "_rpcsx_customConfigDelete"));
+    result.customConfigGet = reinterpret_cast<decltype(customConfigGet)>(dlsym(handle, "_rpcsx_customConfigGet"));
+    result.customConfigSet = reinterpret_cast<decltype(customConfigSet)>(dlsym(handle, "_rpcsx_customConfigSet"));
+    result.customConfigImport = reinterpret_cast<decltype(customConfigImport)>(dlsym(handle, "_rpcsx_customConfigImport"));
     result.setCustomDriver = reinterpret_cast<decltype(setCustomDriver)>(dlsym(handle, "_rpcsx_setCustomDriver"));
     // clang-format on
 
@@ -296,6 +308,44 @@ extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_patchSetEnabled(
   if (!rpcsxLib.patchSetEnabled) return false;
   return rpcsxLib.patchSetEnabled(unwrap(env, jhash), unwrap(env, jdescription),
                                   jenabled);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_customConfigExists(
+    JNIEnv *env, jobject, jstring jserial) {
+  if (!rpcsxLib.customConfigExists) return false;
+  return rpcsxLib.customConfigExists(unwrap(env, jserial));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_customConfigCreate(
+    JNIEnv *env, jobject, jstring jserial) {
+  if (!rpcsxLib.customConfigCreate) return false;
+  return rpcsxLib.customConfigCreate(unwrap(env, jserial));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_customConfigDelete(
+    JNIEnv *env, jobject, jstring jserial) {
+  if (!rpcsxLib.customConfigDelete) return false;
+  return rpcsxLib.customConfigDelete(unwrap(env, jserial));
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_net_rpcsx_RPCSX_customConfigGet(
+    JNIEnv *env, jobject, jstring jserial, jstring jpath) {
+  if (!rpcsxLib.customConfigGet) return wrap(env, std::string{});
+  return wrap(env, rpcsxLib.customConfigGet(unwrap(env, jserial),
+                                            unwrap(env, jpath)));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_customConfigSet(
+    JNIEnv *env, jobject, jstring jserial, jstring jpath, jstring jvalue) {
+  if (!rpcsxLib.customConfigSet) return false;
+  return rpcsxLib.customConfigSet(unwrap(env, jserial), unwrap(env, jpath),
+                                  unwrap(env, jvalue));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_customConfigImport(
+    JNIEnv *env, jobject, jstring jserial, jstring jyaml) {
+  if (!rpcsxLib.customConfigImport) return false;
+  return rpcsxLib.customConfigImport(unwrap(env, jserial), unwrap(env, jyaml));
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

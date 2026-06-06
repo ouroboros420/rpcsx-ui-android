@@ -100,6 +100,12 @@ class RPCSX {
     external fun patchEngineVersion(): String
     external fun patchesList(): String
     external fun patchSetEnabled(hash: String, description: String, enabled: Boolean): Boolean
+    external fun customConfigExists(serial: String): Boolean
+    external fun customConfigCreate(serial: String): Boolean
+    external fun customConfigDelete(serial: String): Boolean
+    external fun customConfigGet(serial: String, path: String): String
+    external fun customConfigSet(serial: String, path: String, value: String): Boolean
+    external fun customConfigImport(serial: String, yaml: String): Boolean
     external fun setCustomDriver(path: String, libraryName: String, hookDir: String): Boolean
 
 
