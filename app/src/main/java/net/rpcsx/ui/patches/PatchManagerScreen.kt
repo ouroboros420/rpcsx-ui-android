@@ -74,12 +74,14 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
 
     LaunchedEffect(Unit) { refresh() }
 
-    // Match against name, author, notes and the game serials (e.g. NPUA70092).
+    // Match against patch name, game title (e.g. "LittleBigPlanet 2"), author,
+    // notes and the game serials (e.g. NPUA70092).
     val filteredPatches = remember(patches, query) {
         val q = query.trim()
         if (q.isEmpty()) patches
         else patches.filter { p ->
             p.name.contains(q, ignoreCase = true) ||
+                p.titles.any { it.contains(q, ignoreCase = true) } ||
                 p.author.contains(q, ignoreCase = true) ||
                 p.notes.contains(q, ignoreCase = true) ||
                 p.serials.any { it.contains(q, ignoreCase = true) }
@@ -186,7 +188,7 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
                             onValueChange = { query = it },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            label = { Text("Search game, serial (e.g. NPUA70092) or author") },
+                            label = { Text("Search by game name, serial, patch or author") },
                             leadingIcon = {
                                 Icon(painterResource(R.drawable.ic_search), contentDescription = null)
                             },
@@ -273,9 +275,12 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
 
 private fun patchSubtitle(patch: Patch): String {
     val author = patch.author.ifEmpty { "Unknown author" }
-    val games = when (patch.serials.size) {
-        0 -> "all games"
-        1 -> patch.serials.first()
+    // Prefer the human-readable game title(s); fall back to serials when absent.
+    val games = when {
+        patch.titles.size == 1 -> patch.titles.first()
+        patch.titles.size > 1 -> "${patch.titles.size} games"
+        patch.serials.isEmpty() -> "all games"
+        patch.serials.size == 1 -> patch.serials.first()
         else -> "${patch.serials.size} games"
     }
     return if (patch.notes.isNotEmpty()) "$author · $games\n${patch.notes}" else "$author · $games"

@@ -17,6 +17,8 @@ data class Patch(
     val version: String = "",
     val notes: String = "",
     val serials: List<String> = emptyList(),
+    /** Game titles this patch targets (e.g. "LittleBigPlanet 2"), from the patch yml. */
+    val titles: List<String> = emptyList(),
     val enabled: Boolean = false,
 )
 

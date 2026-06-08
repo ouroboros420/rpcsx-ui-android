@@ -260,10 +260,23 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
             } else {
                 items(patches, key = { "patch:" + it.hash + "/" + it.name }) { patch ->
                     var patchEnabled by remember(patch.hash + patch.name) { mutableStateOf(patch.enabled) }
+                    val patchSub = listOf(
+                        patch.author.takeIf { it.isNotEmpty() }?.let { "by $it" },
+                        patch.notes.takeIf { it.isNotEmpty() }
+                    ).filterNotNull().joinToString(" · ")
                     SwitchPreference(
                         checked = patchEnabled,
                         title = patch.name.ifEmpty { "(unnamed patch)" },
                         leadingIcon = null,
+                        subtitle = patchSub.takeIf { it.isNotEmpty() }?.let {
+                            {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
                         onClick = { value ->
                             scope.launch {
                                 val ok = withContext(Dispatchers.IO) { PatchRepository.setEnabled(patch, value) }
