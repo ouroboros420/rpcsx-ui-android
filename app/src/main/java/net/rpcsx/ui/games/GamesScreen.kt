@@ -403,9 +403,11 @@ fun GameItem(game: Game, onConfigure: () -> Unit = {}) {
                     // regions; falls back to the local PS3 icon when none resolve.
                     val iconFallback: @Composable () -> Unit = {
                         if (game.info.iconPath.value != null) {
+                            // The local icon is landscape; Fit (not Crop) keeps its
+                            // aspect inside the portrait box instead of stretching it.
                             AsyncImage(
                                 model = game.info.iconPath.value,
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize()
                             )

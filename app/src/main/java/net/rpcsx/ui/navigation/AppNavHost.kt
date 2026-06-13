@@ -792,14 +792,18 @@ fun GamesDestination(
                                 )
                             }
                         }
-                        // Cycle icons -> 2D box art -> 3D box art -> icons.
+                        // Cycle icons -> 2D box art -> 3D box art -> icons, with a
+                        // distinct glyph per state so the current mode is visible.
                         IconButton(onClick = { TileDisplay.toggle() }) {
                             Icon(
                                 painter = painterResource(
-                                    if (TileDisplay.isBoxArt) R.drawable.ic_grid_on
-                                    else R.drawable.ic_grid_off
+                                    when (TileDisplay.mode) {
+                                        "boxart" -> R.drawable.ic_grid_on
+                                        "boxart3d" -> R.drawable.ic_view_3d
+                                        else -> R.drawable.ic_grid_off
+                                    }
                                 ),
-                                contentDescription = "Toggle box art"
+                                contentDescription = "Toggle game tile style"
                             )
                         }
                     }
