@@ -345,10 +345,10 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
                     if (isExpanded) {
                         items(
                             group.shown,
-                            // Key on the (disjoint) underlying hashes so two patches
-                            // that share name/author/version can't collide - a
-                            // duplicate LazyColumn key throws and force-closes the app.
-                            key = { "${group.label}/${it.hashes.joinToString("|")}" }
+                            // group.id is the unique groupBy identity. Hashes are NOT
+                            // unique (one program hash hosts many patches), so keying
+                            // on them collided and force-closed the app.
+                            key = { "${group.label}/${it.id}" }
                         ) { patch ->
                             HomeSwitchPreference(
                                 title = patch.name.ifEmpty { "(unnamed patch)" },

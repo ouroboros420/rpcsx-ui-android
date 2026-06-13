@@ -37,6 +37,13 @@ data class PatchGroup(
     val titles: List<String>,
     val hashes: List<String>,
     val enabled: Boolean,
+    /**
+     * Stable identity unique across all groups: the exact tuple group() buckets
+     * by. Neither the name nor the hash list is unique on its own (one program
+     * hash hosts many patches, and a generic patch name repeats across games), so
+     * this is the only safe LazyColumn key - a duplicate key force-closes the app.
+     */
+    val id: String,
 )
 
 sealed class PatchDownloadResult {
@@ -115,7 +122,7 @@ object PatchRepository {
             listOf(it.name, it.author, it.version, it.notes,
                    it.serials.sorted(), it.titles.sorted())
         }
-            .map { (_, ps) ->
+            .map { (key, ps) ->
                 val f = ps.first()
                 PatchGroup(
                     name = f.name,
@@ -126,6 +133,8 @@ object PatchRepository {
                     titles = ps.flatMap { it.titles }.distinct(),
                     hashes = ps.map { it.hash }.distinct(),
                     enabled = ps.any { it.enabled },
+                    // The bucket key is unique by construction -> a safe stable id.
+                    id = key.joinToString(""),
                 )
             }
 

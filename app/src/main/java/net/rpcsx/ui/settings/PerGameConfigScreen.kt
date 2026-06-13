@@ -294,8 +294,8 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
                         )
                     }
                 } else {
-                    items(patchGroups, key = { "patch:" + it.hashes.joinToString("|") }) { patch ->
-                        var patchEnabled by remember(patch.hashes.joinToString("|")) { mutableStateOf(patch.enabled) }
+                    items(patchGroups, key = { "patch:" + it.id }) { patch ->
+                        var patchEnabled by remember(patch.id) { mutableStateOf(patch.enabled) }
                         val patchSub = listOf(
                             patch.author.takeIf { it.isNotEmpty() }?.let { "by $it" },
                             patch.notes.takeIf { it.isNotEmpty() }
