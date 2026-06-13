@@ -56,6 +56,7 @@ struct RPCSXApi {
   void *(*setCustomDriver)(void *driverHandle);
   void (*setMaxCompileThreads)(int count);
   void (*setPowerSaveMode)(int on);
+  void (*setThermalFrameCap)(float fps);
 };
 
 struct RPCSXLibrary : RPCSXApi {
@@ -129,6 +130,7 @@ struct RPCSXLibrary : RPCSXApi {
     result.setCustomDriver = reinterpret_cast<decltype(setCustomDriver)>(dlsym(handle, "_rpcsx_setCustomDriver"));
     result.setMaxCompileThreads = reinterpret_cast<decltype(setMaxCompileThreads)>(dlsym(handle, "_rpcsx_setMaxCompileThreads"));
     result.setPowerSaveMode = reinterpret_cast<decltype(setPowerSaveMode)>(dlsym(handle, "_rpcsx_setPowerSaveMode"));
+    result.setThermalFrameCap = reinterpret_cast<decltype(setThermalFrameCap)>(dlsym(handle, "_rpcsx_setThermalFrameCap"));
     // clang-format on
 
     return result;
@@ -305,6 +307,12 @@ extern "C" JNIEXPORT void JNICALL Java_net_rpcsx_RPCSX_setPowerSaveMode(
     JNIEnv *, jobject, jboolean on) {
   if (!rpcsxLib.setPowerSaveMode) return;
   rpcsxLib.setPowerSaveMode(on ? 1 : 0);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_net_rpcsx_RPCSX_setThermalFrameCap(
+    JNIEnv *, jobject, jfloat fps) {
+  if (!rpcsxLib.setThermalFrameCap) return;
+  rpcsxLib.setThermalFrameCap(fps);
 }
 
 extern "C" JNIEXPORT jstring JNICALL

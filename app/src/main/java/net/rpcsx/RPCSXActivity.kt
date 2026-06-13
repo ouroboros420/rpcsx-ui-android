@@ -40,6 +40,9 @@ class RPCSXActivity : Activity() {
         unregisterUsbEventListener = listenUsbEvents(this)
         enableFullScreenImmersive()
 
+        // Thermal-aware frame cap: cools the device under sustained load.
+        net.rpcsx.utils.ThermalManager.register(this)
+
         // Prefer steady clocks over short bursts: long emulation sessions are
         // thermally bound, and consistent frametimes beat a higher peak that
         // throttles into stutter. No-op on devices that don't support it.
@@ -99,6 +102,7 @@ class RPCSXActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         RPCSX.state.value = EmulatorState.Paused
+        net.rpcsx.utils.ThermalManager.unregister()
         unregisterUsbEventListener()
         bootThread?.interrupt()
         bootThread?.join()
