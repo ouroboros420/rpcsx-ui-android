@@ -639,6 +639,28 @@ fun SettingsScreen(
                 PreferenceHeader(text = stringResource(R.string.settings_category_emulation))
             }
 
+            item(key = "sustained_performance") {
+                // Relocated from the Controls screen: this is a device-wide
+                // performance/thermal switch, not a gamepad option, so it belongs
+                // under Emulation where it's findable.
+                var itemValue by remember {
+                    mutableStateOf(
+                        GeneralSettings["sustained_performance"] as Boolean? ?: true
+                    )
+                }
+                val def = true
+                SwitchPreference(
+                    checked = itemValue,
+                    title = stringResource(R.string.enable_sustained_performance) + if (itemValue == def) "" else " *",
+                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.sustained_performance_summary), maxLines = 3) },
+                    leadingIcon = null,
+                    onClick = { value ->
+                        GeneralSettings.setValue("sustained_performance", value)
+                        itemValue = value
+                    }
+                )
+            }
+
             item(key = "advanced_settings") {
                 HomePreference(
                     title = stringResource(R.string.advanced_settings),
@@ -869,28 +891,6 @@ fun ControllerSettings(
                 )
             }
 
-            item {
-                var itemValue by remember {
-                    mutableStateOf(
-                        GeneralSettings["sustained_performance"] as Boolean? ?: true
-                    )
-                }
-                val def = true
-                SwitchPreference(
-                    checked = itemValue,
-                    title = stringResource(R.string.enable_sustained_performance) + if (itemValue == def) "" else " *",
-                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.sustained_performance_summary), maxLines = 3) },
-                    leadingIcon = null,
-                    onClick = { value ->
-                        GeneralSettings.setValue("sustained_performance", value)
-                        itemValue = value
-                    }
-                )
-            }
-
-            item {
-                HorizontalDivider()
-            }
 
             item {
                 PreferenceHeader(stringResource(R.string.key_mappings))

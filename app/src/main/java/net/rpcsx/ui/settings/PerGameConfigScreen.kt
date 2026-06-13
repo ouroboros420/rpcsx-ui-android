@@ -138,6 +138,9 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
         patches = withContext(Dispatchers.IO) { PatchRepository.listForSerial(serial) }
         patchesLoading = false
     }
+    // Collapse patches that are identical to the user (registered under several
+    // game-version hashes) into one row each, toggling all hashes at once.
+    val patchGroups = remember(patches) { PatchRepository.group(patches) }
 
     Scaffold(
         topBar = {
@@ -264,7 +267,7 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
             item(key = "patches_header") {
                 CollapsibleSectionHeader(
                     title = "Patches",
-                    subtitle = if (patchesLoading) null else "${patches.size}",
+                    subtitle = if (patchesLoading) null else "${patchGroups.size}",
                     expanded = expandedSections["__patches"] == true,
                     onToggle = {
                         expandedSections["__patches"] = !(expandedSections["__patches"] ?: false)
@@ -281,7 +284,7 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         }
                     }
-                } else if (patches.isEmpty()) {
+                } else if (patchGroups.isEmpty()) {
                     item(key = "patches_empty") {
                         Text(
                             text = "No patches for this game. Open Settings -> Patch Manager to download the official set.",
@@ -291,8 +294,8 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
                         )
                     }
                 } else {
-                    items(patches, key = { "patch:" + it.hash + "/" + it.name }) { patch ->
-                        var patchEnabled by remember(patch.hash + patch.name) { mutableStateOf(patch.enabled) }
+                    items(patchGroups, key = { "patch:" + it.name + "/" + it.author + "/" + it.version }) { patch ->
+                        var patchEnabled by remember(patch.name + patch.author + patch.version) { mutableStateOf(patch.enabled) }
                         val patchSub = listOf(
                             patch.author.takeIf { it.isNotEmpty() }?.let { "by $it" },
                             patch.notes.takeIf { it.isNotEmpty() }

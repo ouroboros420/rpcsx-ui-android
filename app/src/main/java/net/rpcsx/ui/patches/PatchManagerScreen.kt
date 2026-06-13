@@ -51,6 +51,7 @@ import net.rpcsx.R
 import net.rpcsx.ui.settings.components.core.PreferenceIcon
 import net.rpcsx.ui.settings.components.preference.HomeSwitchPreference
 import net.rpcsx.utils.Patch
+import net.rpcsx.utils.PatchGroup
 import net.rpcsx.utils.PatchDownloadResult
 import net.rpcsx.utils.PatchRepository
 
@@ -59,16 +60,16 @@ import net.rpcsx.utils.PatchRepository
 private const val UNIVERSAL_LABEL = "All games (universal)"
 
 /** Every game this patch targets. Falls back to serials, then to the universal group. */
-private fun gameLabelsFor(p: Patch): List<String> {
-    val titles = p.titles.filter { it.isNotBlank() && !it.equals("All", ignoreCase = true) }
-    if (titles.isNotEmpty()) return titles.distinctBy { it.lowercase() }
-    val serials = p.serials.filter { it.isNotBlank() && !it.equals("All", ignoreCase = true) }
-    if (serials.isNotEmpty()) return serials.distinctBy { it.lowercase() }
+private fun gameLabelsFor(titles: List<String>, serials: List<String>): List<String> {
+    val t = titles.filter { it.isNotBlank() && !it.equals("All", ignoreCase = true) }
+    if (t.isNotEmpty()) return t.distinctBy { it.lowercase() }
+    val s = serials.filter { it.isNotBlank() && !it.equals("All", ignoreCase = true) }
+    if (s.isNotEmpty()) return s.distinctBy { it.lowercase() }
     return listOf(UNIVERSAL_LABEL)
 }
 
 /** Matches a patch by its own fields (not the game name, which the section handles). */
-private fun patchMatches(p: Patch, q: String): Boolean =
+private fun patchMatches(p: PatchGroup, q: String): Boolean =
     p.name.contains(q, ignoreCase = true) ||
         p.author.contains(q, ignoreCase = true) ||
         p.notes.contains(q, ignoreCase = true) ||
@@ -79,10 +80,10 @@ private data class GameGroup(
     val label: String,
     val total: Int,
     val enabledCount: Int,
-    val shown: List<Patch>,
+    val shown: List<PatchGroup>,
 )
 
-private fun patchRowSubtitle(patch: Patch): String {
+private fun patchRowSubtitle(patch: PatchGroup): String {
     val author = patch.author.ifEmpty { "Unknown author" }
     val head = if (patch.version.isNotEmpty()) "$author · v${patch.version}" else author
     return if (patch.notes.isNotEmpty()) "$head\n${patch.notes}" else head
@@ -117,18 +118,21 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
     // insensitive), with the universal group pinned last. Recomputed only when the
     // patch set changes (e.g. download, import, or a single-row enable toggle).
     val groups = remember(patches) {
-        val map = sortedMapOf<String, MutableList<Patch>>(String.CASE_INSENSITIVE_ORDER)
-        for (p in patches) {
-            for (label in gameLabelsFor(p)) {
-                map.getOrPut(label) { mutableListOf() }.add(p)
+        // Collapse identical patches (same name/author/version/notes) registered
+        // under multiple game-version hashes into one row first - this is what
+        // removes the confusing duplicate rows. Then bucket each into the games
+        // it targets.
+        val grouped = PatchRepository.group(patches)
+        val map = sortedMapOf<String, MutableList<PatchGroup>>(String.CASE_INSENSITIVE_ORDER)
+        for (g in grouped) {
+            for (label in gameLabelsFor(g.titles, g.serials)) {
+                map.getOrPut(label) { mutableListOf() }.add(g)
             }
         }
         val universal = map.remove(UNIVERSAL_LABEL)
-        // Dedup within a group: a patch reaching the same game via differently
-        // cased title/serial spellings must appear only once (and keeps row keys unique).
         buildList {
-            map.forEach { (label, list) -> add(label to list.distinctBy { it.hash to it.name }) }
-            if (universal != null) add(UNIVERSAL_LABEL to universal.distinctBy { it.hash to it.name })
+            map.forEach { (label, list) -> add(label to list.toList()) }
+            if (universal != null) add(UNIVERSAL_LABEL to universal.toList())
         }
     }
 
@@ -147,11 +151,9 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
         }
     }
 
-    // On a fresh search, open the matched groups by default - but they stay
-    // user-collapsible (the expansion map is the single source of truth below).
-    LaunchedEffect(q) {
-        if (q.isNotEmpty()) visibleGroups.forEach { expanded[it.label] = true }
-    }
+    // Groups stay collapsed by default, including under search - tap a game to
+    // expand it (consistent with the unsearched list; avoids the cluttered
+    // "everything detailed" view).
 
     val totalPatches = remember(patches) { patches.size }
     val totalEnabled = remember(patches) { patches.count { it.enabled } }
@@ -343,7 +345,7 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
                     if (isExpanded) {
                         items(
                             group.shown,
-                            key = { "${group.label}/${it.hash}/${it.name}" }
+                            key = { "${group.label}/${it.name}/${it.author}/${it.version}" }
                         ) { patch ->
                             HomeSwitchPreference(
                                 title = patch.name.ifEmpty { "(unnamed patch)" },
@@ -356,11 +358,10 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
                                             PatchRepository.setEnabled(patch, enabled)
                                         }
                                         if (ok) {
-                                            // Update just this patch (it may appear under several
-                                            // game sections) instead of re-parsing the whole set.
+                                            // Flip every underlying hash optimistically (the row
+                                            // collapses N game-version hashes) without re-parsing.
                                             patches = patches.map {
-                                                if (it.hash == patch.hash && it.name == patch.name)
-                                                    it.copy(enabled = enabled) else it
+                                                if (it.hash in patch.hashes) it.copy(enabled = enabled) else it
                                             }
                                         } else {
                                             Toast.makeText(context, "Could not change patch", Toast.LENGTH_SHORT).show()

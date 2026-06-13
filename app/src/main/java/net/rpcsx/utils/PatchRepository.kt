@@ -22,6 +22,23 @@ data class Patch(
     val enabled: Boolean = false,
 )
 
+/**
+ * A patch as the user sees it: a single row even when the core registers it
+ * under several game-version hashes (same name/author/version/notes). Toggling
+ * flips every underlying hash, so whichever one matches the installed game
+ * actually takes effect - and the list shows it only once instead of N times.
+ */
+data class PatchGroup(
+    val name: String,
+    val author: String,
+    val version: String,
+    val notes: String,
+    val serials: List<String>,
+    val titles: List<String>,
+    val hashes: List<String>,
+    val enabled: Boolean,
+)
+
 sealed class PatchDownloadResult {
     /** updated=false means the local patch set was already up to date. */
     data class Success(val updated: Boolean) : PatchDownloadResult()
@@ -70,9 +87,38 @@ object PatchRepository {
             }
         }
 
+    /**
+     * Collapse patches that are identical to the user (same name/author/version/
+     * notes) into one PatchGroup carrying all their hashes. The core lists the
+     * same patch once per game-version hash it targets, which otherwise shows as
+     * confusing duplicate rows with identical metadata.
+     */
+    fun group(patches: List<Patch>): List<PatchGroup> =
+        patches.groupBy { listOf(it.name, it.author, it.version, it.notes) }
+            .map { (_, ps) ->
+                val f = ps.first()
+                PatchGroup(
+                    name = f.name,
+                    author = f.author,
+                    version = f.version,
+                    notes = f.notes,
+                    serials = ps.flatMap { it.serials }.distinct(),
+                    titles = ps.flatMap { it.titles }.distinct(),
+                    hashes = ps.map { it.hash }.distinct(),
+                    enabled = ps.any { it.enabled },
+                )
+            }
+
     fun setEnabled(patch: Patch, enabled: Boolean): Boolean = runCatching {
         RPCSX.instance.patchSetEnabled(patch.hash, patch.name, enabled)
     }.getOrDefault(false)
+
+    /** Flip every hash behind a grouped patch (attempts all; true if all succeed). */
+    fun setEnabled(group: PatchGroup, enabled: Boolean): Boolean =
+        group.hashes.map { hash ->
+            runCatching { RPCSX.instance.patchSetEnabled(hash, group.name, enabled) }
+                .getOrDefault(false)
+        }.all { it }
 
     /**
      * Download the official RPCS3 patch set. The API answers with JSON
