@@ -764,11 +764,11 @@ fun GamesDestination(
                                 )
                             }
                         }
-                        // Toggle between landscape icons and portrait box-art covers.
+                        // Cycle icons -> 2D box art -> 3D box art -> icons.
                         IconButton(onClick = { TileDisplay.toggle() }) {
                             Icon(
                                 painter = painterResource(
-                                    if (TileDisplay.mode == "boxart") R.drawable.ic_grid_on
+                                    if (TileDisplay.isBoxArt) R.drawable.ic_grid_on
                                     else R.drawable.ic_grid_off
                                 ),
                                 contentDescription = "Toggle box art"

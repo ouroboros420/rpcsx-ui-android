@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,8 +48,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -90,21 +94,115 @@ private fun withAlpha(color: Color, alpha: Float): Color {
     )
 }
 
-/** Game tile display mode, persisted in app settings and observed by the grid. */
+/**
+ * Game tile display mode, persisted in app settings and observed by the grid.
+ * Cycles icon (landscape PS3 icons) -> boxart (portrait 2D covers) ->
+ * boxart3d (the same covers tilted into a pseudo-3D shelf box).
+ */
 object TileDisplay {
     var mode by mutableStateOf(GeneralSettings["tile_mode"].string("icon"))
         private set
 
+    /** True for both 2D and pseudo-3D box-art layouts (portrait covers). */
+    val isBoxArt: Boolean get() = mode == "boxart" || mode == "boxart3d"
+    val is3d: Boolean get() = mode == "boxart3d"
+
     fun toggle() {
-        mode = if (mode == "boxart") "icon" else "boxart"
+        mode = when (mode) {
+            "icon" -> "boxart"
+            "boxart" -> "boxart3d"
+            else -> "icon"
+        }
         GeneralSettings["tile_mode"] = mode
     }
 }
 
-/** GameTDB front-cover URL for a PS3 title id (Coil fetches + disk-caches it). */
-private fun gametdbCoverUrl(titleId: String?): String? =
-    titleId?.takeIf { it.isNotBlank() }
-        ?.let { "https://art.gametdb.com/ps3/coverM/EN/$it.jpg" }
+// GameTDB hosts covers per region; a given title id only exists under the
+// region(s) it released in, so we try the common ones in turn and let the last
+// fallback be the local PS3 icon. Order: English regions first, then JP/EU.
+private val coverRegions = listOf("EN", "US", "JA", "EN", "DE", "FR", "ES", "IT")
+
+/** Candidate GameTDB cover URLs for a PS3 title id, most-likely region first. */
+private fun gametdbCoverUrls(titleId: String?): List<String> =
+    titleId?.takeIf { it.isNotBlank() }?.let { id ->
+        coverRegions.distinct().map { r -> "https://art.gametdb.com/ps3/coverM/$r/$id.jpg" }
+    } ?: emptyList()
+
+/**
+ * Front-cover image that walks the candidate region URLs in order, advancing to
+ * the next whenever one fails to load, and shows [fallback] once all are
+ * exhausted. Coil disk-caches each successful fetch.
+ */
+@Composable
+private fun CoverImage(
+    urls: List<String>,
+    modifier: Modifier = Modifier,
+    fallback: @Composable () -> Unit,
+) {
+    if (urls.isEmpty()) { fallback(); return }
+    var idx by remember(urls) { mutableStateOf(0) }
+    if (idx >= urls.size) { fallback(); return }
+    SubcomposeAsyncImage(
+        model = urls[idx],
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+        // On a 404/failure advance to the next region; recomposition retries it.
+        error = { LaunchedEffect(idx) { idx++ } }
+    )
+}
+
+/**
+ * Pseudo-3D "boxed game on a shelf": the front cover tilted in perspective with
+ * a synthesized spine on the hinge edge and a faint sheen. Uses just the front
+ * cover (not per-title spine cropping), so it looks consistent across every
+ * title regardless of GameTDB's cover layout.
+ */
+@Composable
+private fun Cover3D(
+    urls: List<String>,
+    fallback: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                rotationY = -20f
+                cameraDistance = 14f * density
+                // Pivot near the right edge so the left side recedes into depth.
+                transformOrigin = TransformOrigin(0.78f, 0.5f)
+            }
+    ) {
+        CoverImage(urls, Modifier.fillMaxSize(), fallback)
+
+        // Spine: a dark gradient strip on the left simulating box thickness.
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(10.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
+                    )
+                )
+        )
+
+        // Sheen: a faint diagonal highlight + shade for a glossy-case look.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.10f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.12f),
+                        )
+                    )
+                )
+        )
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -219,7 +317,7 @@ fun GameItem(game: Game, onConfigure: () -> Unit = {}) {
         }
 
         Card(
-            shape = if (TileDisplay.mode == "boxart") MaterialTheme.shapes.medium else RectangleShape,
+            shape = if (TileDisplay.isBoxArt) MaterialTheme.shapes.medium else RectangleShape,
             modifier = Modifier
                 .fillMaxSize()
                 .combinedClickable(onClick = click@{
@@ -286,33 +384,32 @@ fun GameItem(game: Game, onConfigure: () -> Unit = {}) {
                 }
             }
 
-            val boxArt = TileDisplay.mode == "boxart" && game.info.name.value != "VSH"
-            val coverUrl = if (boxArt) gametdbCoverUrl(game.info.titleId.value) else null
+            val boxArt = TileDisplay.isBoxArt && game.info.name.value != "VSH"
+            val coverUrls = if (boxArt) gametdbCoverUrls(game.info.titleId.value) else emptyList()
 
             Box(
                 modifier = (if (boxArt) Modifier.fillMaxWidth().aspectRatio(2f / 3f)
                             else Modifier.height(110.dp).fillMaxSize())
                     .align(alignment = Alignment.CenterHorizontally)
             ) {
-                if (boxArt && coverUrl != null) {
-                    // Portrait cover from GameTDB (disk-cached by Coil); fall back to
-                    // the local PS3 icon when the cover 404s or fails to load.
-                    SubcomposeAsyncImage(
-                        model = coverUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                        error = {
-                            if (game.info.iconPath.value != null) {
-                                AsyncImage(
-                                    model = game.info.iconPath.value,
-                                    contentScale = ContentScale.Crop,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                if (boxArt && coverUrls.isNotEmpty()) {
+                    // Portrait cover from GameTDB (disk-cached by Coil), tried across
+                    // regions; falls back to the local PS3 icon when none resolve.
+                    val iconFallback: @Composable () -> Unit = {
+                        if (game.info.iconPath.value != null) {
+                            AsyncImage(
+                                model = game.info.iconPath.value,
+                                contentScale = ContentScale.Crop,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                    )
+                    }
+                    if (TileDisplay.is3d) {
+                        Cover3D(coverUrls, iconFallback)
+                    } else {
+                        CoverImage(coverUrls, Modifier.fillMaxSize(), iconFallback)
+                    }
                 } else if (game.info.iconPath.value != null && iconExists.value) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -680,7 +777,7 @@ fun GamesScreen(navigateToConfig: (Game) -> Unit = {}) {
     ) {
         LazyVerticalGrid(
             // Portrait covers tile densely (narrower cells); landscape icons keep the wider cell.
-            columns = GridCells.Adaptive(minSize = if (TileDisplay.mode == "boxart") 116.dp else 320.dp * 0.6f),
+            columns = GridCells.Adaptive(minSize = if (TileDisplay.isBoxArt) 116.dp else 320.dp * 0.6f),
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize()
         ) {
