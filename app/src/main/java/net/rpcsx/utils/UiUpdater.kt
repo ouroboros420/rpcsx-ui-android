@@ -38,6 +38,21 @@ class PackageInstallStatusReceiver : BroadcastReceiver() {
 }
 
 object UiUpdater {
+    // Extract the CalVer "YYYY.MM.DD-HHMM" sort key. The zero-padded, fixed-width
+    // form sorts chronologically under plain string comparison. Mirrors the same
+    // helper in RpcsxUpdater so the UI updater also refuses to offer a downgrade.
+    private fun versionSortKey(v: String?): String {
+        if (v == null) return ""
+        return Regex("\\d{4}\\.\\d{2}\\.\\d{2}-\\d{4}").find(v)?.value ?: v
+    }
+
+    // True only when [candidate] is a strictly newer build than [installed]. The
+    // previous check (release.name != BuildConfig.Version) fired on ANY difference,
+    // so a freshly built local build was nagged to "update" to an older GitHub
+    // release whose tag merely differed from the installed version string.
+    private fun isNewer(candidate: String, installed: String?): Boolean =
+        versionSortKey(candidate) > versionSortKey(installed)
+
     suspend fun checkForUpdate(context: Context): String? {
         val url = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("ui_channel", "")!!
 
@@ -45,7 +60,7 @@ object UiUpdater {
             is GitHub.FetchResult.Success<*> -> {
                 val release = fetchResult.content as GitHub.Release
 
-                if (release.name != BuildConfig.Version && release.assets.find { it.name == "rpcsx-release.apk" }?.browser_download_url != null) {
+                if (isNewer(release.name, BuildConfig.Version) && release.assets.find { it.name == "rpcsx-release.apk" }?.browser_download_url != null) {
                     return release.name
                 }
             }
@@ -65,7 +80,7 @@ object UiUpdater {
                 val release = fetchResult.content as GitHub.Release
                 val releaseAsset = release.assets.find { it.name == "rpcsx-release.apk" }
 
-                if (release.name != BuildConfig.Version && releaseAsset?.browser_download_url != null) {
+                if (isNewer(release.name, BuildConfig.Version) && releaseAsset?.browser_download_url != null) {
                     val target = File(destinationDir, "rpcsx-${release.name}.apk")
 
                     if (target.exists()) {

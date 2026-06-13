@@ -96,6 +96,30 @@
     <string name="settings_category_diagnostics">Diagnostics</string>
     <string name="patch_manager">Patch Manager</string>
     <string name="patch_manager_description">Download and enable game patches</string>
+
+    <!-- Clanker (fork) settings hub and its sub-screens -->
+    <string name="clanker_settings">Clanker Settings</string>
+    <string name="clanker_settings_description">Themes, features, and patches added by this fork</string>
+    <string name="clanker_themes">Themes</string>
+    <string name="clanker_themes_description">App theme, Material You, AMOLED</string>
+    <string name="clanker_features">Features</string>
+    <string name="clanker_features_description">Game library layout and performance</string>
+    <string name="clanker_theme_appearance">Appearance</string>
+    <string name="clanker_theme_mode">Theme</string>
+    <string name="clanker_theme_system">System</string>
+    <string name="clanker_theme_light">Light</string>
+    <string name="clanker_theme_dark">Dark</string>
+    <string name="clanker_theme_material_you">Material You colors</string>
+    <string name="clanker_theme_material_you_summary">Use colors from your system wallpaper</string>
+    <string name="clanker_theme_amoled">AMOLED black</string>
+    <string name="clanker_theme_amoled_summary">True-black backgrounds in dark mode (saves power on OLED screens)</string>
+    <string name="clanker_features_library">Game library</string>
+    <string name="clanker_features_performance">Performance</string>
+    <string name="clanker_tile_mode">Game tile layout</string>
+    <string name="clanker_tile_mode_summary">How games appear in the library grid</string>
+    <string name="clanker_tile_icons">Icons</string>
+    <string name="clanker_tile_boxart">2D box art</string>
+    <string name="clanker_tile_boxart3d">3D box art</string>
     <string name="ask_if_reset_key">"Do you want to reset '%1$s' to its default value?"</string>
     <string name="controls">Controls</string>
     <string name="controls_description">Configure controller</string>

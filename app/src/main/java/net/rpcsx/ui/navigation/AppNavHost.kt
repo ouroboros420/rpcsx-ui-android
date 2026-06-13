@@ -97,6 +97,9 @@ import net.rpcsx.ui.drivers.GpuDriversScreen
 import net.rpcsx.ui.games.GamesScreen
 import net.rpcsx.ui.games.TileDisplay
 import net.rpcsx.ui.settings.AdvancedSettingsScreen
+import net.rpcsx.ui.settings.ClankerFeaturesScreen
+import net.rpcsx.ui.settings.ClankerSettingsScreen
+import net.rpcsx.ui.settings.ClankerThemesScreen
 import net.rpcsx.ui.settings.ControllerSettings
 import net.rpcsx.ui.settings.SettingsScreen
 import net.rpcsx.ui.user.UsersScreen
@@ -307,6 +310,31 @@ fun AppNavHost() {
             route = "patch_manager"
         ) {
             PatchManagerScreen(
+                navigateBack = navController::navigateUp,
+            )
+        }
+
+        composable(
+            route = "clanker_settings"
+        ) {
+            ClankerSettingsScreen(
+                navigateBack = navController::navigateUp,
+                navigateTo = navigateTo,
+            )
+        }
+
+        composable(
+            route = "clanker_themes"
+        ) {
+            ClankerThemesScreen(
+                navigateBack = navController::navigateUp,
+            )
+        }
+
+        composable(
+            route = "clanker_features"
+        ) {
+            ClankerFeaturesScreen(
                 navigateBack = navController::navigateUp,
             )
         }

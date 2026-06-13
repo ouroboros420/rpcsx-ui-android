@@ -77,7 +77,6 @@ import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import net.rpcsx.ui.settings.components.core.PreferenceHeader
 import net.rpcsx.ui.settings.components.core.PreferenceIcon
-import net.rpcsx.ui.settings.components.core.PreferenceSubtitle
 import net.rpcsx.ui.settings.components.core.PreferenceValue
 import net.rpcsx.ui.settings.components.preference.HomePreference
 import net.rpcsx.ui.settings.components.preference.HomeSwitchPreference
@@ -90,7 +89,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.rpcsx.R
 import net.rpcsx.RPCSX
-import net.rpcsx.ThemeState
 import net.rpcsx.UserRepository
 import net.rpcsx.dialogs.AlertDialogQueue
 import net.rpcsx.provider.AppDataDocumentProvider
@@ -592,39 +590,15 @@ fun SettingsScreen(
                 PreferenceHeader(text = stringResource(R.string.settings_category_general))
             }
 
-            item(key = "theme_mode") {
-                val labels = listOf("System", "Light", "Dark")
-                val values = listOf("system", "light", "dark")
-                SingleSelectionDialog(
-                    currentValue = labels[values.indexOf(ThemeState.mode).coerceAtLeast(0)],
-                    values = labels,
-                    icon = null,
-                    title = "Theme",
-                    onValueChange = { label ->
-                        ThemeState.mode = values[labels.indexOf(label).coerceAtLeast(0)]
-                    }
-                )
-            }
-
-            if (ThemeState.dynamicSupported) {
-                item(key = "theme_dynamic") {
-                    SwitchPreference(
-                        checked = ThemeState.dynamicColor,
-                        title = "Material You colors",
-                        subtitle = { PreferenceSubtitle(text = "Use colors from your system wallpaper", maxLines = 2) },
-                        leadingIcon = null,
-                        onClick = { ThemeState.dynamicColor = it }
-                    )
-                }
-            }
-
-            item(key = "theme_amoled") {
-                SwitchPreference(
-                    checked = ThemeState.amoled,
-                    title = "AMOLED black",
-                    subtitle = { PreferenceSubtitle(text = "True-black backgrounds in dark mode (saves power on OLED screens)", maxLines = 2) },
-                    leadingIcon = null,
-                    onClick = { ThemeState.amoled = it }
+            item(key = "clanker_settings") {
+                // Everything this fork adds on top of upstream RPCSX lives behind one
+                // entry with click-through sub-categories (Themes / Features / Patch
+                // Manager), instead of loose toggles scattered through the list.
+                HomePreference(
+                    title = stringResource(R.string.clanker_settings),
+                    icon = { PreferenceIcon(icon = painterResource(R.drawable.ic_star)) },
+                    description = stringResource(R.string.clanker_settings_description),
+                    onClick = { navigateTo("clanker_settings") }
                 )
             }
 
@@ -674,28 +648,6 @@ fun SettingsScreen(
 
             item(key = "hdr_emulation") {
                 PreferenceHeader(text = stringResource(R.string.settings_category_emulation))
-            }
-
-            item(key = "sustained_performance") {
-                // Relocated from the Controls screen: this is a device-wide
-                // performance/thermal switch, not a gamepad option, so it belongs
-                // under Emulation where it's findable.
-                var itemValue by remember {
-                    mutableStateOf(
-                        GeneralSettings["sustained_performance"] as Boolean? ?: true
-                    )
-                }
-                val def = true
-                SwitchPreference(
-                    checked = itemValue,
-                    title = stringResource(R.string.enable_sustained_performance) + if (itemValue == def) "" else " *",
-                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.sustained_performance_summary), maxLines = 3) },
-                    leadingIcon = null,
-                    onClick = { value ->
-                        GeneralSettings.setValue("sustained_performance", value)
-                        itemValue = value
-                    }
-                )
             }
 
             item(key = "advanced_settings") {
@@ -750,15 +702,6 @@ fun SettingsScreen(
                     icon = { Icon(painterResource(R.drawable.gamepad), null) },
                     description = stringResource(R.string.controls_description),
                     onClick = { navigateTo("controls") }
-                )
-            }
-
-            item(key = "patch_manager") {
-                HomePreference(
-                    title = stringResource(R.string.patch_manager),
-                    icon = { PreferenceIcon(icon = painterResource(R.drawable.ic_build)) },
-                    description = stringResource(R.string.patch_manager_description),
-                    onClick = { navigateTo("patch_manager") }
                 )
             }
 

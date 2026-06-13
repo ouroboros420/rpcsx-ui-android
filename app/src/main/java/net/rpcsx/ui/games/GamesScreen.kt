@@ -115,6 +115,12 @@ object TileDisplay {
         }
         GeneralSettings["tile_mode"] = mode
     }
+
+    /** Set the layout directly (used by the Clanker Features settings selector). */
+    fun select(newMode: String) {
+        mode = newMode
+        GeneralSettings["tile_mode"] = newMode
+    }
 }
 
 // GameTDB hosts covers per region; a given title id only exists under the
