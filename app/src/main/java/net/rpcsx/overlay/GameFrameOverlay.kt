@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.Log
 import android.view.SurfaceView
 
 /**
@@ -19,14 +20,18 @@ import android.view.SurfaceView
  * any plain sibling View's pixels in that rect - so a plain-View overlay never
  * shows over the game (verified broken on Adreno). PadOverlay works precisely
  * because it is a SurfaceView that draws through the view path; this mirrors that
- * proven pattern. It draws nothing into its own surface (no holder use) and never
- * consumes input, so the game surface and controls are unaffected.
+ * proven pattern exactly (no holder use, no background, no z-order calls). It
+ * never consumes input, so the game surface and controls are unaffected.
+ *
+ * Logs under tag "RPCSX-GameFrame" so a logcat tells us definitively whether
+ * configure ran, the view got a size, and draw fired.
  */
 class GameFrameOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(context, attrs) {
 
     private var radiusPx = 0f
     private var drawCornerMask = false
     private var drawBorder = false
+    private var drawLogs = 0
 
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -38,9 +43,6 @@ class GameFrameOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(co
     init {
         isClickable = false
         isFocusable = false
-        // Transparent so the game shows through everywhere we don't paint. Matches
-        // PadOverlay (which also relies on the view-draw path over the game).
-        setBackgroundColor(Color.TRANSPARENT)
     }
 
     private fun dp(v: Int) = v * resources.displayMetrics.density
@@ -60,13 +62,31 @@ class GameFrameOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(co
         borderPaint.color = borderColor
         borderPaint.strokeWidth = dp(borderWidthDp)
         visibility = if (drawCornerMask || drawBorder) VISIBLE else GONE
+        drawLogs = 0
+        Log.i(TAG, "configure rounded=$roundedCorners radiusDp=$cornerRadiusDp cornerColor=${hex(cornerColor)} " +
+                "border=$border borderDp=$borderWidthDp borderColor=${hex(borderColor)} " +
+                "-> mask=$drawCornerMask drawBorder=$drawBorder visibility=${if (visibility == VISIBLE) "VISIBLE" else "GONE"}")
         invalidate()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        Log.i(TAG, "attached (visibility=${if (visibility == VISIBLE) "VISIBLE" else "GONE"})")
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        Log.i(TAG, "size ${w}x$h")
     }
 
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
         val w = width.toFloat()
         val h = height.toFloat()
+        if (drawLogs < 3) {
+            Log.i(TAG, "draw ${w.toInt()}x${h.toInt()} mask=$drawCornerMask border=$drawBorder")
+            drawLogs++
+        }
         if (w <= 0f || h <= 0f) return
 
         if (drawCornerMask) {
@@ -85,5 +105,11 @@ class GameFrameOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(co
             rect.set(inset, inset, w - inset, h - inset)
             canvas.drawRoundRect(rect, radiusPx, radiusPx, borderPaint)
         }
+    }
+
+    private fun hex(c: Int) = String.format("#%08X", c)
+
+    private companion object {
+        const val TAG = "RPCSX-GameFrame"
     }
 }
