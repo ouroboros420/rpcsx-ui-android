@@ -70,7 +70,7 @@
         </activity>
         
         <provider
-            android:authorities="net.rpcsx.documents"
+            android:authorities="${applicationId}.documents"
             android:name="net.rpcsx.provider.AppDataDocumentProvider"
             android:exported="true"
             android:grantUriPermissions="true"

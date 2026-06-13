@@ -35,7 +35,10 @@ android {
     ndkVersion = "29.0.13113456"
 
     defaultConfig {
-        applicationId = "net.rpcsx"
+        // Distinct from official RPCSX (net.rpcsx) so this fork installs
+        // side-by-side instead of overwriting it. The Kotlin namespace stays
+        // net.rpcsx; only the installed package identity changes here.
+        applicationId = "net.rpcsx.clanker"
         minSdk = 29
         targetSdk = 35
         versionCode = System.getenv("RX_VERSION_CODE")?.toIntOrNull() ?: gitDateCode(rootDir)

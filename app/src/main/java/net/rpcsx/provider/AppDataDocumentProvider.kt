@@ -8,6 +8,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
+import net.rpcsx.BuildConfig
 import net.rpcsx.R
 import java.io.File
 import java.io.FileNotFoundException
@@ -16,7 +17,10 @@ import java.io.IOException
 class AppDataDocumentProvider : DocumentsProvider() {
     companion object {
         const val ROOT_ID = "root"
-        const val AUTHORITY = "net.rpcsx" + ".documents"
+        // Derived from the applicationId so it stays globally unique per install
+        // (a fixed authority would clash with official RPCSX and fail to install).
+        // Must match android:authorities="${applicationId}.documents" in the manifest.
+        val AUTHORITY = BuildConfig.APPLICATION_ID + ".documents"
 
         private val DEFAULT_ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,
