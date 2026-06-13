@@ -153,27 +153,8 @@ fun ClankerThemesScreen(navigateBack: () -> Unit) {
 fun ClankerFeaturesScreen(navigateBack: () -> Unit) {
     ClankerScaffold(stringResource(R.string.clanker_features), navigateBack) { contentPadding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            item(key = "hdr_library") {
-                PreferenceHeader(text = stringResource(R.string.clanker_features_library))
-            }
-            item(key = "tile_mode") {
-                val labels = listOf(
-                    stringResource(R.string.clanker_tile_icons),
-                    stringResource(R.string.clanker_tile_boxart),
-                    stringResource(R.string.clanker_tile_boxart3d),
-                )
-                val values = listOf("icon", "boxart", "boxart3d")
-                SingleSelectionDialog(
-                    currentValue = labels[values.indexOf(TileDisplay.mode).coerceAtLeast(0)],
-                    values = labels,
-                    icon = null,
-                    title = stringResource(R.string.clanker_tile_mode),
-                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.clanker_tile_mode_summary), maxLines = 2) },
-                    onValueChange = { label ->
-                        TileDisplay.select(values[labels.indexOf(label).coerceAtLeast(0)])
-                    }
-                )
-            }
+            // Game tile layout (box-art covers) selector removed for now - the
+            // cover feature is cut until remote loading is reliable on-device.
 
             item(key = "hdr_performance") {
                 PreferenceHeader(text = stringResource(R.string.clanker_features_performance))

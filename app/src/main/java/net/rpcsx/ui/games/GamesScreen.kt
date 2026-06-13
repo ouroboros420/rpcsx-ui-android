@@ -95,32 +95,16 @@ private fun withAlpha(color: Color, alpha: Float): Color {
 }
 
 /**
- * Game tile display mode, persisted in app settings and observed by the grid.
- * Cycles icon (landscape PS3 icons) -> boxart (portrait 2D covers) ->
- * boxart3d (the same covers tilted into a pseudo-3D shelf box).
+ * Game tile display mode. The box-art (GameTDB cover) modes are CUT for now -
+ * remote cover loading was unreliable on-device, so the grid always shows the
+ * local PS3 icon. The cover/3D rendering code below is left dormant (unused) so
+ * the feature can be revived and tested later; the toggle button and the tile
+ * setting are removed while it's disabled.
  */
 object TileDisplay {
-    var mode by mutableStateOf(GeneralSettings["tile_mode"].string("icon"))
-        private set
-
-    /** True for both 2D and pseudo-3D box-art layouts (portrait covers). */
-    val isBoxArt: Boolean get() = mode == "boxart" || mode == "boxart3d"
-    val is3d: Boolean get() = mode == "boxart3d"
-
-    fun toggle() {
-        mode = when (mode) {
-            "icon" -> "boxart"
-            "boxart" -> "boxart3d"
-            else -> "icon"
-        }
-        GeneralSettings["tile_mode"] = mode
-    }
-
-    /** Set the layout directly (used by the Clanker Features settings selector). */
-    fun select(newMode: String) {
-        mode = newMode
-        GeneralSettings["tile_mode"] = newMode
-    }
+    val mode: String get() = "icon"
+    val isBoxArt: Boolean get() = false
+    val is3d: Boolean get() = false
 }
 
 // GameTDB hosts covers per region; a given title id only exists under the
