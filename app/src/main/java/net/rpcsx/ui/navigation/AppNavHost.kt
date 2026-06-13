@@ -208,7 +208,12 @@ fun AppNavHost() {
                 navigateToSettings = { navigateTo("settings") },
                 drawerState,
                 navigateToConfig = { game ->
-                    val serial = PerGameConfigRepository.serialOf(game.info.path)
+                    // Use the real title id - the core boots and looks up custom configs
+                    // and patches by title id. For HDD games the folder name already
+                    // equals it; for disc/ISO games it differs, which previously wrote
+                    // configs to a filename boot never loaded and hid the game's patches.
+                    val serial = game.info.titleId.value?.takeIf { it.isNotBlank() }
+                        ?: PerGameConfigRepository.serialOf(game.info.path)
                     val name = game.info.name.value ?: serial
                     navigateTo("game_config/${Uri.encode(serial)}/${Uri.encode(name)}")
                 }

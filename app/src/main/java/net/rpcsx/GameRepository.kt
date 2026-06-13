@@ -27,7 +27,8 @@ data class GameInfo @Keep @JvmOverloads constructor(
     var name: String? = null,
     var iconPath: String? = null,
     var gameFlags: Int = 0,
-    var version: String? = null
+    var version: String? = null,
+    var titleId: String? = null
 )
 
 data class GameInfoStore(
@@ -35,7 +36,8 @@ data class GameInfoStore(
     val name: MutableState<String?> = mutableStateOf(null),
     val iconPath: MutableState<String?> = mutableStateOf(null),
     val gameFlags: MutableIntState = mutableIntStateOf(0),
-    val version: MutableState<String?> = mutableStateOf(null)
+    val version: MutableState<String?> = mutableStateOf(null),
+    val titleId: MutableState<String?> = mutableStateOf(null)
 )
 
 enum class GameProgressType {
@@ -76,7 +78,8 @@ private fun toStore(info: GameInfo) =
         mutableStateOf(info.name),
         mutableStateOf(info.iconPath),
         mutableIntStateOf(info.gameFlags),
-        mutableStateOf(info.version)
+        mutableStateOf(info.version),
+        mutableStateOf(info.titleId)
     )
 
 private fun toInfo(store: GameInfoStore) =
@@ -85,7 +88,8 @@ private fun toInfo(store: GameInfoStore) =
         store.name.value,
         store.iconPath.value,
         store.gameFlags.intValue,
-        store.version.value
+        store.version.value,
+        store.titleId.value
     )
 
 class GameRepository {
@@ -184,6 +188,9 @@ class GameRepository {
                         existsGame.info.version.value =
                             info.version?.takeIf { it.isNotBlank() }
                                 ?: existsGame.info.version.value
+                        existsGame.info.titleId.value =
+                            info.titleId?.takeIf { it.isNotBlank() }
+                                ?: existsGame.info.titleId.value
                         if (progressId >= 0) {
                             existsGame.addProgress(
                                 GameProgress(
