@@ -117,12 +117,19 @@ object PatchRepository {
      * patch (e.g. "60 FPS") for a DIFFERENT game stays separate - merging across
      * games was what made toggling one row flip many unrelated patches.
      */
+    /**
+     * The group identity a single patch belongs to - the exact tuple group()
+     * buckets by, joined with a control-free separator. Lets callers map an
+     * individual Patch to its PatchGroup.id WITHOUT matching on hash (one program
+     * hash hosts many patches, so a hash match flips unrelated rows).
+     */
+    fun groupIdOf(p: Patch): String =
+        listOf(p.name, p.author, p.version, p.notes,
+               p.serials.sorted(), p.titles.sorted()).joinToString("«|»")
+
     fun group(patches: List<Patch>): List<PatchGroup> =
-        patches.groupBy {
-            listOf(it.name, it.author, it.version, it.notes,
-                   it.serials.sorted(), it.titles.sorted())
-        }
-            .map { (key, ps) ->
+        patches.groupBy { groupIdOf(it) }
+            .map { (id, ps) ->
                 val f = ps.first()
                 PatchGroup(
                     name = f.name,
@@ -133,8 +140,7 @@ object PatchRepository {
                     titles = ps.flatMap { it.titles }.distinct(),
                     hashes = ps.map { it.hash }.distinct(),
                     enabled = ps.any { it.enabled },
-                    // The bucket key is unique by construction -> a safe stable id.
-                    id = key.joinToString("«|»"),
+                    id = id,
                 )
             }
 

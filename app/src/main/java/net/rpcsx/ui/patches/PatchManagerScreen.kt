@@ -361,10 +361,11 @@ fun PatchManagerScreen(navigateBack: () -> Unit) {
                                             PatchRepository.setEnabled(patch, enabled)
                                         }
                                         if (ok) {
-                                            // Flip every underlying hash optimistically (the row
-                                            // collapses N game-version hashes) without re-parsing.
+                                            // Flip only the patches in THIS group (same identity),
+                                            // not every patch sharing a program hash - one hash hosts
+                                            // many patches, so a hash match flipped unrelated rows.
                                             patches = patches.map {
-                                                if (it.hash in patch.hashes) it.copy(enabled = enabled) else it
+                                                if (PatchRepository.groupIdOf(it) == patch.id) it.copy(enabled = enabled) else it
                                             }
                                         } else {
                                             Toast.makeText(context, "Could not change patch", Toast.LENGTH_SHORT).show()
