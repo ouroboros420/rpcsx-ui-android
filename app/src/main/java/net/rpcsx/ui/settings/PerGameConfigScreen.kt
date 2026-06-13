@@ -1,9 +1,11 @@
 package net.rpcsx.ui.settings
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -103,6 +107,26 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
     val configLoading = loaded == null
     val hasCustom = loaded?.hasCustom ?: false
     val entries = loaded?.entries ?: emptyList()
+
+    // Group the flat config into top-level sections (Core, Video, Audio, ...).
+    // A new section starts at each top-level header (one with no " / "); its
+    // sub-headers and leaves become the section body.
+    val settingsSections = remember(entries) {
+        val sections = mutableListOf<Pair<String, MutableList<ConfigEntry>>>()
+        for (e in entries) {
+            if (e is ConfigEntry.Header && !e.title.contains(" / ")) {
+                sections.add(e.title to mutableListOf())
+            } else {
+                if (sections.isEmpty()) sections.add("Settings" to mutableListOf())
+                sections.last().second.add(e)
+            }
+        }
+        sections.map { it.first to it.second.toList() }
+    }
+
+    // Sections collapse by default (absent == collapsed) so the whole screen is
+    // scannable at a glance; the user expands only what they need.
+    val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
 
     fun reload() { reloadKey++ }
 
@@ -236,64 +260,73 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
                 }
             }
 
+            // Patches - collapsible, collapsed by default.
             item(key = "patches_header") {
-                PreferenceHeader(text = "Patches")
-            }
-            if (patchesLoading) {
-                item(key = "patches_loading") {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                CollapsibleSectionHeader(
+                    title = "Patches",
+                    subtitle = if (patchesLoading) null else "${patches.size}",
+                    expanded = expandedSections["__patches"] == true,
+                    onToggle = {
+                        expandedSections["__patches"] = !(expandedSections["__patches"] ?: false)
                     }
-                }
-            } else if (patches.isEmpty()) {
-                item(key = "patches_empty") {
-                    Text(
-                        text = "No patches for this game. Open Settings -> Patch Manager to download the official set.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                    )
-                }
-            } else {
-                items(patches, key = { "patch:" + it.hash + "/" + it.name }) { patch ->
-                    var patchEnabled by remember(patch.hash + patch.name) { mutableStateOf(patch.enabled) }
-                    val patchSub = listOf(
-                        patch.author.takeIf { it.isNotEmpty() }?.let { "by $it" },
-                        patch.notes.takeIf { it.isNotEmpty() }
-                    ).filterNotNull().joinToString(" · ")
-                    SwitchPreference(
-                        checked = patchEnabled,
-                        title = patch.name.ifEmpty { "(unnamed patch)" },
-                        leadingIcon = null,
-                        subtitle = patchSub.takeIf { it.isNotEmpty() }?.let {
-                            {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        },
-                        onClick = { value ->
-                            scope.launch {
-                                val ok = withContext(Dispatchers.IO) { PatchRepository.setEnabled(patch, value) }
-                                if (ok) {
-                                    patchEnabled = value
-                                } else {
-                                    Toast.makeText(context, "Could not change patch", Toast.LENGTH_SHORT).show()
+                )
+            }
+            if (expandedSections["__patches"] == true) {
+                if (patchesLoading) {
+                    item(key = "patches_loading") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                } else if (patches.isEmpty()) {
+                    item(key = "patches_empty") {
+                        Text(
+                            text = "No patches for this game. Open Settings -> Patch Manager to download the official set.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                        )
+                    }
+                } else {
+                    items(patches, key = { "patch:" + it.hash + "/" + it.name }) { patch ->
+                        var patchEnabled by remember(patch.hash + patch.name) { mutableStateOf(patch.enabled) }
+                        val patchSub = listOf(
+                            patch.author.takeIf { it.isNotEmpty() }?.let { "by $it" },
+                            patch.notes.takeIf { it.isNotEmpty() }
+                        ).filterNotNull().joinToString(" · ")
+                        SwitchPreference(
+                            checked = patchEnabled,
+                            title = patch.name.ifEmpty { "(unnamed patch)" },
+                            leadingIcon = null,
+                            subtitle = patchSub.takeIf { it.isNotEmpty() }?.let {
+                                {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            onClick = { value ->
+                                scope.launch {
+                                    val ok = withContext(Dispatchers.IO) { PatchRepository.setEnabled(patch, value) }
+                                    if (ok) {
+                                        patchEnabled = value
+                                    } else {
+                                        Toast.makeText(context, "Could not change patch", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
 
-            item(key = "settings_header") {
-                PreferenceHeader(text = "Settings")
-            }
+            // Settings - one collapsible section per top-level category, all
+            // collapsed by default so everything is findable without scrolling.
             if (configLoading) {
                 item(key = "settings_loading") {
                     Box(
@@ -322,14 +355,67 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
                     }
                 }
             } else {
-                items(entries, key = { entryKey(it) }) { entry ->
-                    when (entry) {
-                        is ConfigEntry.Header -> PreferenceHeader(text = entry.title)
-                        is ConfigEntry.Leaf -> ConfigLeaf(serial, entry)
+                settingsSections.forEach { (sectionTitle, sectionEntries) ->
+                    item(key = "sec/$sectionTitle") {
+                        CollapsibleSectionHeader(
+                            title = sectionTitle,
+                            subtitle = null,
+                            expanded = expandedSections[sectionTitle] == true,
+                            onToggle = {
+                                expandedSections[sectionTitle] = !(expandedSections[sectionTitle] ?: false)
+                            }
+                        )
+                    }
+                    if (expandedSections[sectionTitle] == true) {
+                        items(sectionEntries, key = { "sec/$sectionTitle/" + entryKey(it) }) { entry ->
+                            when (entry) {
+                                is ConfigEntry.Header -> PreferenceHeader(text = entry.title)
+                                is ConfigEntry.Leaf -> ConfigLeaf(serial, entry)
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CollapsibleSectionHeader(
+    title: String,
+    subtitle: String?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            painter = painterResource(
+                if (expanded) R.drawable.ic_keyboard_arrow_up else R.drawable.ic_keyboard_arrow_down
+            ),
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
