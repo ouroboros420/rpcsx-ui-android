@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,9 +52,12 @@ import net.rpcsx.ui.settings.components.preference.SingleSelectionDialog
 import net.rpcsx.ui.settings.components.preference.SliderPreference
 import net.rpcsx.ui.settings.components.preference.SwitchPreference
 import net.rpcsx.utils.CommunityConfigFetch
+import net.rpcsx.utils.GameServerApplyResult
+import net.rpcsx.utils.GameServerSwitch
 import net.rpcsx.utils.Patch
 import net.rpcsx.utils.PatchRepository
 import net.rpcsx.utils.PerGameConfigRepository
+import net.rpcsx.utils.RpcnRepository
 import org.json.JSONObject
 
 private sealed class ConfigEntry {
@@ -151,6 +155,18 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
     // Collapse patches that are identical to the user (registered under several
     // game-version hashes) into one row each, toggling all hashes at once.
     val patchGroups = remember(patches) { PatchRepository.group(patches) }
+
+    // Per-game "online server" (DNS host-switch). gameServer is non-null only
+    // when this title has a known community replacement server; manualSwapList
+    // prefills the advanced manual-redirect field. Loaded off the main thread.
+    var gameServer by remember { mutableStateOf<GameServerSwitch?>(null) }
+    var manualSwapList by remember { mutableStateOf("") }
+    var showManualSwap by remember { mutableStateOf(false) }
+    var applyingServer by remember { mutableStateOf(false) }
+    LaunchedEffect(serial) {
+        gameServer = RpcnRepository.gameServerFor(context, serial)
+        manualSwapList = RpcnRepository.currentSwapList(serial)
+    }
 
     Scaffold(
         topBar = {
@@ -268,6 +284,103 @@ fun PerGameConfigScreen(serial: String, gameName: String, navigateBack: () -> Un
                         }
                         Spacer(Modifier.width(8.dp))
                         Text("Use RPCS3 community config")
+                    }
+
+                    // Game online server (per-game DNS host-switch). One-tap apply
+                    // when this title has a known community replacement server, plus
+                    // a collapsible advanced manual-redirect field. Redirects this
+                    // game's network traffic to a community server (the originals are
+                    // offline) and needs a game restart to take effect.
+                    val gs = gameServer
+                    if (gs != null) {
+                        Button(
+                            onClick = {
+                                applyingServer = true
+                                scope.launch {
+                                    val res = RpcnRepository.applyGameServer(serial, gs)
+                                    applyingServer = false
+                                    when (res) {
+                                        is GameServerApplyResult.Applied -> {
+                                            manualSwapList = RpcnRepository.currentSwapList(serial)
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.game_server_applied),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        is GameServerApplyResult.Error ->
+                                            Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            enabled = !applyingServer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (applyingServer) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Icon(painterResource(R.drawable.ic_cloud_download), contentDescription = null)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(context.getString(R.string.game_server_apply, gs.name))
+                        }
+                        Text(
+                            text = context.getString(R.string.game_server_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+
+                    // Advanced: manual server redirect, collapsed by default so it
+                    // does not clutter. Lets power users point any game at a host
+                    // even when there is no known community server.
+                    OutlinedButton(
+                        onClick = { showManualSwap = !showManualSwap },
+                        enabled = !applyingServer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            context.getString(
+                                if (showManualSwap) R.string.game_server_manual_hide
+                                else R.string.game_server_manual_show
+                            )
+                        )
+                    }
+                    if (showManualSwap) {
+                        OutlinedTextField(
+                            value = manualSwapList,
+                            onValueChange = { manualSwapList = it },
+                            singleLine = false,
+                            label = { Text(context.getString(R.string.game_server_manual_label)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                applyingServer = true
+                                scope.launch {
+                                    val res = RpcnRepository.applyManualSwapList(serial, manualSwapList.trim())
+                                    applyingServer = false
+                                    Toast.makeText(
+                                        context,
+                                        when (res) {
+                                            is GameServerApplyResult.Applied ->
+                                                context.getString(R.string.game_server_applied)
+                                            is GameServerApplyResult.Error -> res.message
+                                        },
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            },
+                            enabled = !applyingServer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(context.getString(R.string.game_server_manual_save))
+                        }
                     }
 
                     if (hasCustom) {

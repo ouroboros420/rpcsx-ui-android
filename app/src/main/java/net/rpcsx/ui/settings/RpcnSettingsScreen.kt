@@ -51,8 +51,6 @@ import net.rpcsx.RPCSX
 import net.rpcsx.ui.settings.components.core.PreferenceHeader
 import net.rpcsx.ui.settings.components.core.PreferenceSubtitle
 import net.rpcsx.ui.settings.components.preference.SwitchPreference
-import net.rpcsx.utils.GameServerApplyResult
-import net.rpcsx.utils.GameServerSwitch
 import net.rpcsx.utils.PerGameConfigRepository
 import net.rpcsx.utils.RpcnHost
 import net.rpcsx.utils.RpcnRepository
@@ -96,13 +94,6 @@ fun RpcnSettingsScreen(navigateBack: () -> Unit) {
     var suggestions by remember { mutableStateOf<List<RpcnSuggestedServer>>(emptyList()) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // Per-game online server switch (DNS IP-swap). Null until loaded / when the
-    // current game has no known community server (in which case we show nothing).
-    var gameServer by remember { mutableStateOf<GameServerSwitch?>(null) }
-    var applyingServer by remember { mutableStateOf(false) }
-    var showManualSwap by remember { mutableStateOf(false) }
-    var manualSwapList by remember { mutableStateOf("") }
-
     // Current game serial, if any game is selected/running. Best-effort: prefer
     // the booted title id, fall back to deriving it from the active game path.
     val currentSerial = remember {
@@ -129,8 +120,6 @@ fun RpcnSettingsScreen(navigateBack: () -> Unit) {
         refreshHosts()
         if (currentSerial.isNotBlank()) {
             suggestions = RpcnRepository.suggestedServersFor(context, currentSerial)
-            gameServer = RpcnRepository.gameServerFor(context, currentSerial)
-            manualSwapList = RpcnRepository.currentSwapList(currentSerial)
         }
     }
 
@@ -318,134 +307,7 @@ fun RpcnSettingsScreen(navigateBack: () -> Unit) {
                 }
             }
 
-            // (C) Game online server (per-game DNS switch) -------------------
-            // Always shown so the feature is discoverable: a header plus either
-            // the apply button (running game has a known server) or a hint
-            // explaining it is per-game.
-            val gs = gameServer
-            item(key = "hdr_game_server") {
-                PreferenceHeader(text = stringResource(R.string.game_server_header))
-            }
-            if (gs != null && currentSerial.isNotBlank()) {
-                item(key = "game_server_card") {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(gs.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(
-                                stringResource(R.string.game_server_note),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedButton(
-                                    enabled = !applyingServer,
-                                    onClick = {
-                                        applyingServer = true
-                                        scope.launch {
-                                            val res = RpcnRepository.applyGameServer(currentSerial, gs)
-                                            applyingServer = false
-                                            when (res) {
-                                                is GameServerApplyResult.Applied -> {
-                                                    manualSwapList = RpcnRepository.currentSwapList(currentSerial)
-                                                    toast(context.getString(R.string.game_server_applied))
-                                                }
-                                                is GameServerApplyResult.Error ->
-                                                    toast(res.message)
-                                            }
-                                        }
-                                    }
-                                ) { Text(stringResource(R.string.game_server_apply, gs.name)) }
-                                Spacer(Modifier.width(8.dp))
-                                TextButton(
-                                    enabled = !applyingServer,
-                                    onClick = {
-                                        scope.launch {
-                                            gameServer = RpcnRepository.gameServerFor(context, currentSerial)
-                                            toast(context.getString(R.string.game_server_refreshed))
-                                        }
-                                    }
-                                ) { Text(stringResource(R.string.game_server_refresh)) }
-                                if (applyingServer) {
-                                    Spacer(Modifier.width(12.dp))
-                                    CircularProgressIndicator(modifier = Modifier.height(20.dp).width(20.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                item(key = "game_server_hint") {
-                    PreferenceSubtitle(
-                        text = stringResource(
-                            if (currentSerial.isBlank()) R.string.game_server_no_game
-                            else R.string.game_server_no_match
-                        ),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                        maxLines = 3
-                    )
-                }
-            }
-
-            // Advanced: manual swap-list entry, collapsed by default so it does
-            // not clutter. Available whenever a game is known, even with no
-            // registry match (lets power users redirect any game by hand).
-            if (currentSerial.isNotBlank()) {
-                item(key = "manual_swap_toggle") {
-                    TextButton(
-                        onClick = { showManualSwap = !showManualSwap },
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    ) {
-                        Text(
-                            stringResource(
-                                if (showManualSwap) R.string.game_server_manual_hide
-                                else R.string.game_server_manual_show
-                            )
-                        )
-                    }
-                }
-                if (showManualSwap) {
-                    item(key = "manual_swap_field") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = manualSwapList,
-                                onValueChange = { manualSwapList = it },
-                                singleLine = false,
-                                label = { Text(stringResource(R.string.game_server_manual_label)) },
-                                placeholder = { Text("host=ip&&host2=ip") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedButton(
-                                enabled = !applyingServer,
-                                onClick = {
-                                    applyingServer = true
-                                    scope.launch {
-                                        val res = RpcnRepository.applyManualSwapList(
-                                            currentSerial, manualSwapList.trim()
-                                        )
-                                        applyingServer = false
-                                        toast(
-                                            when (res) {
-                                                is GameServerApplyResult.Applied ->
-                                                    context.getString(R.string.game_server_applied)
-                                                is GameServerApplyResult.Error -> res.message
-                                            }
-                                        )
-                                    }
-                                }
-                            ) { Text(stringResource(R.string.game_server_manual_save)) }
-                        }
-                    }
-                }
-            }
-
-            // (D) Servers (RPCN account host list) ---------------------------
+            // (C) Servers (RPCN account host list) ---------------------------
             item(key = "hdr_servers") { PreferenceHeader(text = stringResource(R.string.rpcn_servers_header)) }
 
             if (suggestions.isNotEmpty()) {
