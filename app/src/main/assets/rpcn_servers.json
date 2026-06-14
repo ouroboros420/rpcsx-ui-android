@@ -1,0 +1,15 @@
+{
+  "comment": "Maps a PS3 game serial to community RPCN servers that game is known to need. Bundled so the suggestions work fully offline; an updatable copy may be fetched from the remote URL in RpcnRepository. Hosts here are community placeholders - verify against the RPCS3 wiki before relying on them.",
+  "version": 1,
+  "servers": {
+    "BLES00932": [
+      { "name": "Demon's Souls (community)", "host": "demonssouls.rpcn.example.net" }
+    ],
+    "BLUS30443": [
+      { "name": "Demon's Souls (community)", "host": "demonssouls.rpcn.example.net" }
+    ],
+    "BCJS30022": [
+      { "name": "Demon's Souls (community)", "host": "demonssouls.rpcn.example.net" }
+    ]
+  }
+}

@@ -142,6 +142,38 @@
     <string name="clanker_tile_icons">Icons</string>
     <string name="clanker_tile_boxart">2D box art</string>
     <string name="clanker_tile_boxart3d">3D box art</string>
+
+    <!-- Netplay (RPCN) - community-PSN online play -->
+    <string name="rpcn_title">Netplay (RPCN)</string>
+    <string name="rpcn_entry_description">Community online play, accounts and servers</string>
+    <string name="rpcn_status_header">Status</string>
+    <string name="rpcn_enable">Enable online (RPCN)</string>
+    <string name="rpcn_enable_summary">Connects to a community server (RPCN), not Sony PSN. Use a unique id and password, never your real PSN details.</string>
+    <string name="rpcn_test_connection">Test connection</string>
+    <string name="rpcn_connected">Connected</string>
+    <string name="rpcn_toggle_failed">Could not change online state</string>
+    <string name="rpcn_account_header">Account</string>
+    <string name="rpcn_npid">Online ID (NPID)</string>
+    <string name="rpcn_password">Password</string>
+    <string name="rpcn_online_name">Online name</string>
+    <string name="rpcn_email">Email</string>
+    <string name="rpcn_country">Country (2-letter)</string>
+    <string name="rpcn_token">Token</string>
+    <string name="rpcn_create_account">Create account</string>
+    <string name="rpcn_resend_token">Resend token</string>
+    <string name="rpcn_sign_in">Sign in / Verify</string>
+    <string name="rpcn_need_npid_password">Online ID and password are required</string>
+    <string name="rpcn_account_created">Account created. Check your email for the token.</string>
+    <string name="rpcn_token_resent">Token resent. Check your email.</string>
+    <string name="rpcn_signed_in">Signed in</string>
+    <string name="rpcn_servers_header">Servers</string>
+    <string name="rpcn_suggested_header">Suggested for this game</string>
+    <string name="rpcn_add_server">Add custom server</string>
+    <string name="rpcn_server_description">Description</string>
+    <string name="rpcn_server_host">Host (host:port)</string>
+    <string name="rpcn_added">Added %1$s</string>
+    <string name="rpcn_add_failed">Could not save server</string>
+
     <string name="ask_if_reset_key">"Do you want to reset '%1$s' to its default value?"</string>
     <string name="controls">Controls</string>
     <string name="controls_description">Configure controller</string>

@@ -93,6 +93,14 @@ fun ClankerSettingsScreen(
                     onClick = { navigateTo("clanker_features") }
                 )
             }
+            item(key = "clanker_netplay") {
+                HomePreference(
+                    title = stringResource(R.string.rpcn_title),
+                    icon = { PreferenceIcon(icon = painterResource(R.drawable.ic_cloud_download)) },
+                    description = stringResource(R.string.rpcn_entry_description),
+                    onClick = { navigateTo("rpcn_settings") }
+                )
+            }
             item(key = "clanker_patches") {
                 HomePreference(
                     title = stringResource(R.string.patch_manager),

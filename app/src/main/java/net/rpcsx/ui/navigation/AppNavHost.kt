@@ -103,6 +103,7 @@ import net.rpcsx.ui.settings.ClankerFeaturesScreen
 import net.rpcsx.ui.settings.ClankerSettingsScreen
 import net.rpcsx.ui.settings.ClankerThemesScreen
 import net.rpcsx.ui.settings.ControllerSettings
+import net.rpcsx.ui.settings.RpcnSettingsScreen
 import net.rpcsx.ui.settings.SettingsScreen
 import net.rpcsx.ui.user.UsersScreen
 import net.rpcsx.utils.FileUtil
@@ -337,6 +338,14 @@ fun AppNavHost() {
             route = "clanker_features"
         ) {
             ClankerFeaturesScreen(
+                navigateBack = navController::navigateUp,
+            )
+        }
+
+        composable(
+            route = "rpcn_settings"
+        ) {
+            RpcnSettingsScreen(
                 navigateBack = navController::navigateUp,
             )
         }
