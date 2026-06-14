@@ -15,7 +15,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -602,6 +604,12 @@ fun GamesDestination(
     )
 
     ModalNavigationDrawer(
+        // Paint the whole window with the theme background so the area behind the
+        // system nav bar (the Scaffold pads it out) is true-black under AMOLED
+        // instead of showing the static window background.
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {

@@ -128,6 +128,8 @@
     <string name="clanker_gv_border_color_summary">Color of the outline around each game tile.</string>
     <string name="clanker_features_library">Game library</string>
     <string name="clanker_features_performance">Performance</string>
+    <string name="clanker_cpu_affinity">CPU affinity (experimental)</string>
+    <string name="clanker_cpu_affinity_summary">Pins the heavy emulation threads to the fast CPU cores, freeing the efficiency cores. May reduce heat - or cost FPS on some games. Test it; turn off if anything runs worse.</string>
     <string name="clanker_battery_saver">Battery saver</string>
     <string name="clanker_battery_saver_summary">Cuts power and heat: caps the GPU to the display refresh and lets idle SPU cores sleep instead of spinning. Recommended for handhelds. Turn off if you notice a frame-rate drop.</string>
     <string name="clanker_auto_threads">Auto-limit compile threads (low RAM)</string>

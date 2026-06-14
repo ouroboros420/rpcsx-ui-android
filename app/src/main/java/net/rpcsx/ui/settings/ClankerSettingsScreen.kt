@@ -247,6 +247,20 @@ fun ClankerFeaturesScreen(navigateBack: () -> Unit) {
                     }
                 )
             }
+            item(key = "cpu_affinity") {
+                var itemValue by remember { mutableStateOf(GeneralSettings["cpu_affinity"] as? Boolean ?: false) }
+                SwitchPreference(
+                    checked = itemValue,
+                    title = stringResource(R.string.clanker_cpu_affinity),
+                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.clanker_cpu_affinity_summary), maxLines = 3) },
+                    leadingIcon = null,
+                    onClick = { value ->
+                        GeneralSettings.setValue("cpu_affinity", value)
+                        runCatching { net.rpcsx.RPCSX.instance.setCpuAffinityMode(value) }
+                        itemValue = value
+                    }
+                )
+            }
             item(key = "auto_compile_threads") {
                 val context = LocalContext.current
                 var itemValue by remember { mutableStateOf(CompileThreadPolicy.enabled) }
