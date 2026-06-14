@@ -1,0 +1,22 @@
+{
+  "comment": "Per-GAME community online server switches. Distinct from rpcn_servers.json (which is the RPCN account/host list). This maps a PS3 game serial to the DNS 'IP swap list' that redirects the game's dead first-party server hostnames to a community replacement server. Applied per game via the core's Net@@IP swap list config (the DNS hook reads it at game boot). Bundled so it works fully offline; an updatable copy is fetched from the remote URL in RpcnRepository and overrides this when reachable. The remote registry is the source of truth - community server IPs can change.",
+  "ip_note": "206.189.232.242 is the community-maintained Demon's Souls (DESSEGO) server. If it moves, the remote registry is updated and this bundle becomes a fallback only.",
+  "version": 1,
+  "games": {
+    "BLUS30443": {
+      "name": "Demon's Souls (community server)",
+      "swap_list": "ds-eu-c.scej-online.jp=206.189.232.242&&ds-eu-g.scej-online.jp=206.189.232.242&&c.demons-souls.com=206.189.232.242&&g.demons-souls.com=206.189.232.242&&cmnap.scej-online.jp=206.189.232.242&&demons-souls.scej-online.jp=206.189.232.242",
+      "dns": "8.8.8.8"
+    },
+    "BLES00932": {
+      "name": "Demon's Souls (community server)",
+      "swap_list": "ds-eu-c.scej-online.jp=206.189.232.242&&ds-eu-g.scej-online.jp=206.189.232.242&&c.demons-souls.com=206.189.232.242&&g.demons-souls.com=206.189.232.242&&cmnap.scej-online.jp=206.189.232.242&&demons-souls.scej-online.jp=206.189.232.242",
+      "dns": "8.8.8.8"
+    },
+    "BCJS30022": {
+      "name": "Demon's Souls (community server)",
+      "swap_list": "ds-eu-c.scej-online.jp=206.189.232.242&&ds-eu-g.scej-online.jp=206.189.232.242&&c.demons-souls.com=206.189.232.242&&g.demons-souls.com=206.189.232.242&&cmnap.scej-online.jp=206.189.232.242&&demons-souls.scej-online.jp=206.189.232.242",
+      "dns": "8.8.8.8"
+    }
+  }
+}

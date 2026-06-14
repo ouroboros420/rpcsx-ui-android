@@ -32,6 +32,25 @@ data class RpcnSuggestedServer(
 )
 
 /**
+ * A per-game online server switch: redirects a game's dead first-party server
+ * hostnames to a community replacement via the core's DNS hook (Net > IP swap
+ * list). Distinct from the RPCN account/host list above - this is per-GAME DNS.
+ */
+data class GameServerSwitch(
+    val name: String,
+    /** Net "IP swap list" value: "host1=ip&&host2=ip&&...". */
+    val swapList: String,
+    /** Optional DNS override; blank = leave the game's current DNS untouched. */
+    val dns: String = "",
+)
+
+/** Outcome of applying a per-game server switch. */
+sealed class GameServerApplyResult {
+    object Applied : GameServerApplyResult()
+    data class Error(val message: String) : GameServerApplyResult()
+}
+
+/**
  * App-side glue for RPCN (community-PSN online play). Every native call here may
  * block on the network and is therefore wrapped so callers can run it on
  * Dispatchers.IO; every call is also wrapped in runCatching so a thrown native
@@ -52,11 +71,31 @@ object RpcnRepository {
 
     private const val ASSET_NAME = "rpcn_servers.json"
 
+    // Per-game DNS server-switch registry (distinct from the RPCN host list).
+    private const val GAME_SERVERS_ASSET = "game_servers.json"
+
     // Updatable registry, fetched with the same raw.githubusercontent pattern as
     // the rest of the fork's remote data. If this fails we fall back to the
     // bundled asset, so the constant being unreachable is never fatal.
     private const val REMOTE_REGISTRY_URL =
         "https://raw.githubusercontent.com/Ouroboros420/rpcsx-ui-android/master/app/src/main/assets/rpcn_servers.json"
+
+    private const val REMOTE_GAME_SERVERS_URL =
+        "https://raw.githubusercontent.com/Ouroboros420/rpcsx-ui-android/master/app/src/main/assets/game_servers.json"
+
+    // Core config node paths ("@@"-separated). Verified against the core's cfg
+    // names in Emu/system_config.h (node "Net"): swap list "IP swap list",
+    // internet enable enum "Internet enabled", DNS "DNS address".
+    private const val PATH_SWAP_LIST = "Net@@IP swap list"
+    private const val PATH_INTERNET = "Net@@Internet enabled"
+    private const val PATH_DNS = "Net@@DNS address"
+
+    // The "Internet enabled" cfg is an np_internet_status enum that serializes
+    // via fmt_class_string to "Disconnected"/"Connected" (NOT "Enabled"). The
+    // enabling value is therefore "Connected" (verified in
+    // Emu/system_config_types.cpp). customConfigSet takes a JSON-encoded value,
+    // so string/enum values are passed JSON-quoted.
+    private const val INTERNET_ENABLED_VALUE = "Connected"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
@@ -214,4 +253,107 @@ object RpcnRepository {
         }
         return out
     }
+
+    // ---- per-game online server switch (DNS IP-swap) ----------------------
+
+    /**
+     * The community server switch known for a game, or null if none. Tries the
+     * remote registry first (source of truth, always current), then silently
+     * falls back to the bundled asset on any failure. Never throws.
+     */
+    suspend fun gameServerFor(context: Context, serial: String): GameServerSwitch? =
+        withContext(Dispatchers.IO) {
+            if (serial.isBlank()) return@withContext null
+            val remote = runCatching { fetchRemote(REMOTE_GAME_SERVERS_URL) }.getOrNull()
+            val json = remote ?: runCatching { readBundled(context, GAME_SERVERS_ASSET) }.getOrElse {
+                Log.e(TAG, "bundled game-server registry unreadable", it)
+                return@withContext null
+            }
+            runCatching { parseGameServer(json, serial) }.getOrElse {
+                Log.e(TAG, "game-server registry parse failed", it)
+                null
+            }
+        }
+
+    private fun parseGameServer(json: String, serial: String): GameServerSwitch? {
+        val games = JSONObject(json).optJSONObject("games") ?: return null
+        // Serial match is case-insensitive: scan keys rather than relying on case.
+        val key = games.keys().asSequence().firstOrNull { it.equals(serial, ignoreCase = true) }
+            ?: return null
+        val o = games.optJSONObject(key) ?: return null
+        val swap = o.optString("swap_list")
+        if (swap.isBlank()) return null
+        return GameServerSwitch(
+            name = o.optString("name").ifBlank { "Community server" },
+            swapList = swap,
+            dns = o.optString("dns"),
+        )
+    }
+
+    /**
+     * The easy button: apply a community server switch to a game's custom config.
+     * Ensures the per-game config exists, writes the IP swap list + (optional)
+     * DNS, and enables internet. All native calls are off the main thread and
+     * wrapped; never throws. The game must be RESTARTED for the DNS hook to read
+     * the new swap list at boot.
+     */
+    suspend fun applyGameServer(serial: String, switch: GameServerSwitch): GameServerApplyResult =
+        withContext(Dispatchers.IO) {
+            if (serial.isBlank()) {
+                return@withContext GameServerApplyResult.Error("No game selected")
+            }
+            runCatching {
+                // 1. Ensure the per-game custom config exists.
+                if (!PerGameConfigRepository.hasCustomConfig(serial)) {
+                    if (!PerGameConfigRepository.createCustomConfig(serial)) {
+                        return@runCatching GameServerApplyResult.Error("Could not create game config")
+                    }
+                }
+                // 2. IP swap list (string node -> JSON-quoted value).
+                if (!PerGameConfigRepository.set(serial, PATH_SWAP_LIST, jsonStr(switch.swapList))) {
+                    return@runCatching GameServerApplyResult.Error("Could not set server list")
+                }
+                // 3. Optional DNS override (only if the registry specifies one).
+                if (switch.dns.isNotBlank()) {
+                    PerGameConfigRepository.set(serial, PATH_DNS, jsonStr(switch.dns))
+                }
+                // 4. Enable internet (enum node -> "Connected").
+                PerGameConfigRepository.set(serial, PATH_INTERNET, jsonStr(INTERNET_ENABLED_VALUE))
+                GameServerApplyResult.Applied
+            }.getOrElse {
+                Log.e(TAG, "applyGameServer failed", it)
+                GameServerApplyResult.Error(it.message ?: "Apply failed")
+            }
+        }
+
+    /**
+     * Advanced: write a raw IP swap list directly (manual entry) and enable
+     * internet. Same paths/encoding as applyGameServer. Never throws.
+     */
+    suspend fun applyManualSwapList(serial: String, swapList: String): GameServerApplyResult =
+        applyGameServer(serial, GameServerSwitch(name = "Manual", swapList = swapList, dns = ""))
+
+    /** Current IP swap list for a game (empty if none / unreadable). */
+    suspend fun currentSwapList(serial: String): String = withContext(Dispatchers.IO) {
+        if (serial.isBlank()) return@withContext ""
+        runCatching {
+            val node = PerGameConfigRepository.get(serial, PATH_SWAP_LIST) ?: return@runCatching ""
+            node.optString("value")
+        }.getOrElse { "" }
+    }
+
+    /** JSON-encode a scalar string for customConfigSet (which json::parses it). */
+    private fun jsonStr(value: String): String = JSONObject.quote(value)
+
+    // Generic remote/bundled readers reused by both registries.
+    private fun fetchRemote(url: String): String {
+        val request = Request.Builder().url(url).header("User-Agent", "rpcsx").build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw java.io.IOException("HTTP ${resp.code}")
+            return resp.body?.string().orEmpty().ifBlank { throw java.io.IOException("empty body") }
+        }
+    }
+
+    private fun readBundled(context: Context, asset: String): String =
+        context.assets.open(asset).bufferedReader().use { it.readText() }
 }
