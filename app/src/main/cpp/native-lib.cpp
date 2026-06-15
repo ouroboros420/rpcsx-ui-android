@@ -55,6 +55,7 @@ struct RPCSXApi {
   bool (*customConfigImport)(std::string_view serial, std::string_view yaml);
   void *(*setCustomDriver)(void *driverHandle);
   void (*setMaxCompileThreads)(int count);
+  void (*setCompileMemoryBudget)(long long bytes);
   void (*setPowerSaveMode)(int on);
   void (*setThermalFrameCap)(float fps);
   void (*setCpuAffinityMode)(int on);
@@ -144,6 +145,7 @@ struct RPCSXLibrary : RPCSXApi {
     result.customConfigImport = reinterpret_cast<decltype(customConfigImport)>(dlsym(handle, "_rpcsx_customConfigImport"));
     result.setCustomDriver = reinterpret_cast<decltype(setCustomDriver)>(dlsym(handle, "_rpcsx_setCustomDriver"));
     result.setMaxCompileThreads = reinterpret_cast<decltype(setMaxCompileThreads)>(dlsym(handle, "_rpcsx_setMaxCompileThreads"));
+    result.setCompileMemoryBudget = reinterpret_cast<decltype(setCompileMemoryBudget)>(dlsym(handle, "_rpcsx_setCompileMemoryBudget"));
     result.setPowerSaveMode = reinterpret_cast<decltype(setPowerSaveMode)>(dlsym(handle, "_rpcsx_setPowerSaveMode"));
     result.setThermalFrameCap = reinterpret_cast<decltype(setThermalFrameCap)>(dlsym(handle, "_rpcsx_setThermalFrameCap"));
     result.setCpuAffinityMode = reinterpret_cast<decltype(setCpuAffinityMode)>(dlsym(handle, "_rpcsx_setCpuAffinityMode"));
@@ -331,6 +333,13 @@ extern "C" JNIEXPORT void JNICALL Java_net_rpcsx_RPCSX_setMaxCompileThreads(
   // Guard: an older core library may not export this symbol.
   if (!rpcsxLib.setMaxCompileThreads) return;
   rpcsxLib.setMaxCompileThreads(count);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_net_rpcsx_RPCSX_setCompileMemoryBudget(
+    JNIEnv *, jobject, jlong bytes) {
+  // Guard: an older core library may not export this symbol.
+  if (!rpcsxLib.setCompileMemoryBudget) return;
+  rpcsxLib.setCompileMemoryBudget(static_cast<long long>(bytes));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_net_rpcsx_RPCSX_setPowerSaveMode(

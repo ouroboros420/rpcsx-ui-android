@@ -62,11 +62,44 @@ object CompileThreadPolicy {
     }
 
     /**
-     * Install the effective compile-thread cap in the core. Call once after the
-     * core is initialized and whenever the toggle changes - before any game boots.
-     * When disabled (or on high-RAM devices) the cap is 0 == no cap == stock RPCSX.
+     * Device-scaled LLVM compile MEMORY budget in bytes (0 = let the core use its
+     * own conservative fallback). This is the real OOM guard: it bounds how much
+     * RAM concurrent module compiles may hold, so a worst-case large module (Mafia
+     * II: ~1.67 GB) serializes (compiles alone) instead of coexisting with another
+     * and blowing past the Low Memory Killer ceiling, while small modules still
+     * compile concurrently.
+     *
+     * Why not the core's get_total_memory()/3: on Android sysconf over-reports (it
+     * counts zRAM pages), so total/3 (~3.5 GiB on this 8 GB device) is far larger
+     * than the ~3 GB the process can actually allocate before being killed. We use
+     * ActivityManager.totalMem (honest physical RAM) to pick a safe scaled budget,
+     * sized below one ~1.67 GB module on memory-constrained devices so big modules
+     * serialize. This is applied independently of the thread cap toggle: the budget
+     * is pure safety + device-scaling, not a feature to switch off.
+     */
+    fun safeBudgetBytes(context: Context): Long {
+        val gib = totalRamGib(context)
+        val mib = when {
+            gib <= 0.0 -> 0L      // couldn't read RAM: core falls back to its own cap
+            gib < 9.0 -> 1536L    // <=8 GB: below one ~1.67 GB module -> serialize big ones
+            gib < 13.0 -> 2560L   // 12 GB
+            gib < 24.0 -> 4096L   // 16 GB
+            else -> 6144L         // 24 GB+
+        }
+        return mib * 1024L * 1024L
+    }
+
+    /**
+     * Install the effective compile policy in the core. Call once after the core is
+     * initialized and whenever the toggle changes - before any game boots.
+     *
+     * - Memory budget: always pushed (device-scaled safety; the real OOM guard).
+     * - Thread cap: pushed only when enabled. When disabled (or on high-RAM
+     *   devices) the cap is 0 == no cap; the memory budget still protects against
+     *   OOM, so disabling the cap can't reintroduce the mid-compile crash.
      */
     fun apply(context: Context) {
+        runCatching { RPCSX.instance.setCompileMemoryBudget(safeBudgetBytes(context)) }
         val cap = if (enabled) safeThreads(context) else 0
         runCatching { RPCSX.instance.setMaxCompileThreads(cap) }
     }

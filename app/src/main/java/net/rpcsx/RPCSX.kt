@@ -87,6 +87,7 @@ class RPCSX {
     external fun settingsGet(path: String): String
     external fun settingsSet(path: String, value: String): Boolean
     external fun setMaxCompileThreads(count: Int)
+    external fun setCompileMemoryBudget(bytes: Long)
     external fun setPowerSaveMode(on: Boolean)
     external fun setThermalFrameCap(fps: Float)
     external fun setCpuAffinityMode(on: Boolean)
