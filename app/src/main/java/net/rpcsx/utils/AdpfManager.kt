@@ -46,7 +46,8 @@ object AdpfManager {
 
     private var thread: HandlerThread? = null
     private var handler: Handler? = null
-    private var session: PerformanceHintManager.Session? = null
+    @Volatile private var session: PerformanceHintManager.Session? = null
+    private var sessionTid = 0
     private var pm: PowerManager? = null
     @Volatile private var running = false
     private var headroomTick = 0
@@ -71,29 +72,31 @@ object AdpfManager {
         h.post(object : Runnable {
             override fun run() {
                 if (!running) return
-                val sess = session
-                if (sess == null) {
-                    val tid = runCatching { RPCSX.instance.getRsxThreadTid() }.getOrDefault(0)
-                    if (tid != 0) {
-                        // Initial target = the measured frame period (deadline), so a 30fps
-                        // game is not judged against a fixed 60fps target. Fall back to the
-                        // default if the period is not measured yet.
-                        val period = runCatching { RPCSX.instance.getFramePeriodNanos() }.getOrDefault(0L)
-                        val target = if (period > 0L) period else DEFAULT_TARGET_NANOS
-                        session = runCatching {
-                            phm.createHintSession(intArrayOf(tid), target)
-                        }.getOrNull()
-                        if (session != null) {
-                            lastTargetNanos = target
-                            Log.i(TAG, "ADPF hint session created (rsx tid=$tid, target=${target}ns)")
-                        } else {
-                            // Device/driver does not support hint sessions - stop quietly.
-                            Log.i(TAG, "ADPF hint session unsupported on this device; disabling feed")
-                            running = false
-                            return
-                        }
+                val tid = runCatching { RPCSX.instance.getRsxThreadTid() }.getOrDefault(0)
+
+                // (Re)create the hint session when we have none, OR when the RSX thread's
+                // tid changed - an in-app game restart spawns a NEW RSX thread, and the old
+                // session would keep hinting a dead thread. Recreate so the scheduler tracks
+                // the live thread.
+                if (tid != 0 && (session == null || tid != sessionTid)) {
+                    val period = runCatching { RPCSX.instance.getFramePeriodNanos() }.getOrDefault(0L)
+                    val target = if (period > 0L) period else DEFAULT_TARGET_NANOS
+                    runCatching { session?.close() }
+                    session = runCatching { phm.createHintSession(intArrayOf(tid), target) }.getOrNull()
+                    if (session != null) {
+                        sessionTid = tid
+                        lastTargetNanos = target
+                        Log.i(TAG, "ADPF hint session created (rsx tid=$tid, target=${target}ns)")
+                    } else {
+                        // Device/driver does not support hint sessions - stop quietly.
+                        Log.i(TAG, "ADPF hint session unsupported on this device; disabling feed")
+                        running = false
+                        return
                     }
-                } else {
+                }
+
+                val sess = session
+                if (sess != null) {
                     // Track the deadline: if the frame period shifts (e.g. 30<->60fps), update
                     // the target so the scheduler aims for the real budget, not a fixed one.
                     val period = runCatching { RPCSX.instance.getFramePeriodNanos() }.getOrDefault(0L)
@@ -124,11 +127,19 @@ object AdpfManager {
 
     fun unregister() {
         running = false
-        handler?.removeCallbacksAndMessages(null)
-        runCatching { session?.close() }
-        session = null
+        val h = handler
+        val t = thread
+        // Close the session ON the poll thread (h) so it serializes with any in-flight
+        // report - closing it from this (main) thread could race a concurrent
+        // reportActualWorkDuration on the poll thread (use-after-close).
+        h?.removeCallbacksAndMessages(null)
+        h?.post {
+            runCatching { session?.close() }
+            session = null
+            sessionTid = 0
+            t?.quitSafely()
+        }
         handler = null
-        thread?.quitSafely()
         thread = null
         pm = null
     }
