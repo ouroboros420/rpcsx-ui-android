@@ -18,7 +18,8 @@
 struct RPCSXApi {
   bool (*overlayPadData)(int digital1, int digital2, int leftStickX,
                          int leftStickY, int rightStickX, int rightStickY);
-  bool (*initialize)(std::string_view rootDir, std::string_view user);
+  bool (*initialize)(std::string_view rootDir, std::string_view internalDir,
+                     std::string_view user);
   bool (*processCompilationQueue)(JNIEnv *env);
   bool (*startMainThreadProcessor)(JNIEnv *env);
   bool (*collectGameInfo)(JNIEnv *env, std::string_view rootDir,
@@ -219,8 +220,9 @@ extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_overlayPadData(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_initialize(
-    JNIEnv *env, jobject, jstring rootDir, jstring user) {
-  return rpcsxLib.initialize(unwrap(env, rootDir), unwrap(env, user));
+    JNIEnv *env, jobject, jstring rootDir, jstring internalDir, jstring user) {
+  return rpcsxLib.initialize(unwrap(env, rootDir), unwrap(env, internalDir),
+                             unwrap(env, user));
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
