@@ -18,8 +18,9 @@
 struct RPCSXApi {
   bool (*overlayPadData)(int digital1, int digital2, int leftStickX,
                          int leftStickY, int rightStickX, int rightStickY);
-  bool (*initialize)(std::string_view rootDir, std::string_view internalDir,
-                     std::string_view user);
+  bool (*initialize)(std::string_view rootDir, std::string_view user);
+  // Additive, optional: may be null when running against an older core .so.
+  void (*setRpcnConfigDir)(std::string_view internalDir);
   bool (*processCompilationQueue)(JNIEnv *env);
   bool (*startMainThreadProcessor)(JNIEnv *env);
   bool (*collectGameInfo)(JNIEnv *env, std::string_view rootDir,
@@ -115,6 +116,7 @@ struct RPCSXLibrary : RPCSXApi {
     // clang-format off
     result.overlayPadData = reinterpret_cast<decltype(overlayPadData)>(dlsym(handle, "_rpcsx_overlayPadData"));
     result.initialize = reinterpret_cast<decltype(initialize)>(dlsym(handle, "_rpcsx_initialize"));
+    result.setRpcnConfigDir = reinterpret_cast<decltype(setRpcnConfigDir)>(dlsym(handle, "_rpcsx_setRpcnConfigDir"));
     result.processCompilationQueue = reinterpret_cast<decltype(processCompilationQueue)>(dlsym(handle, "_rpcsx_processCompilationQueue"));
     result.startMainThreadProcessor = reinterpret_cast<decltype(startMainThreadProcessor)>(dlsym(handle, "_rpcsx_startMainThreadProcessor"));
     result.collectGameInfo = reinterpret_cast<decltype(collectGameInfo)>(dlsym(handle, "_rpcsx_collectGameInfo"));
@@ -220,9 +222,16 @@ extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_overlayPadData(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_initialize(
-    JNIEnv *env, jobject, jstring rootDir, jstring internalDir, jstring user) {
-  return rpcsxLib.initialize(unwrap(env, rootDir), unwrap(env, internalDir),
-                             unwrap(env, user));
+    JNIEnv *env, jobject, jstring rootDir, jstring user) {
+  return rpcsxLib.initialize(unwrap(env, rootDir), unwrap(env, user));
+}
+
+extern "C" JNIEXPORT void JNICALL Java_net_rpcsx_RPCSX_setRpcnConfigDir(
+    JNIEnv *env, jobject, jstring internalDir) {
+  // Optional: the symbol is absent on older core builds, so guard the pointer.
+  if (rpcsxLib.setRpcnConfigDir) {
+    rpcsxLib.setRpcnConfigDir(unwrap(env, internalDir));
+  }
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

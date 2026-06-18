@@ -100,9 +100,12 @@ class MainActivity : ComponentActivity() {
             RPCSX.nativeLibDirectory = nativeLibraryDir
 
             if (RPCSX.activeLibrary.value != null) {
+                // Hand the core the app-private dir for secrets (rpcn.yml) BEFORE
+                // initialize, so the very first RPCN config load resolves to internal
+                // storage. No-ops gracefully on older core .so builds.
+                RPCSX.instance.setRpcnConfigDir(applicationContext.filesDir.absolutePath)
                 RPCSX.instance.initialize(
                     RPCSX.rootDirectory,
-                    applicationContext.filesDir.absolutePath,
                     UserRepository.getUserFromSettings()
                 )
                 // Apply the device-adaptive compile-thread cap before any game can

@@ -72,7 +72,10 @@ enum class BootResult
 class RPCSX {
     external fun openLibrary(path: String): Boolean
     external fun getLibraryVersion(path: String): String?
-    external fun initialize(rootDir: String, internalDir: String, user: String): Boolean
+    external fun initialize(rootDir: String, user: String): Boolean
+    // Additive: tells the core the app-private dir for secrets (rpcn.yml).
+    // No-ops on older core .so builds that lack the symbol.
+    external fun setRpcnConfigDir(internalDir: String)
     external fun installFw(fd: Int, progressId: Long): Boolean
     external fun install(fd: Int, progressId: Long): Boolean
     external fun installKey(fd: Int, requestId: Long, gamePath: String): Boolean
