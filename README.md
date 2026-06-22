@@ -1,13 +1,13 @@
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" width="96" align="left" alt="RPCSX-Clanker icon">
+<p align="center">
+  <img src=".github/icon.png" width="120" alt="RPCSX-Clanker icon">
+</p>
 
-# RPCSX-Clanker (experimental)
+<h1 align="center">RPCSX-Clanker <sub>(experimental)</sub></h1>
 
 A native Android front-end for **PlayStation 3** emulation on arm64. A continuously-updated
 fork of [RPCSX/rpcsx-ui-android](https://github.com/RPCSX/rpcsx-ui-android). The actual
 emulation is done by the separate
 [RPCSX-Clanker core](https://github.com/Ouroboros420/rpcsx), loaded at runtime.
-
-<br clear="left">
 
 It ships as the **`net.rpcsx.clanker`** package so it installs side-by-side with official
 RPCSX.
@@ -16,9 +16,11 @@ RPCSX.
 
 ## Two requests if you use this build
 
-This is **not original work** — the emulator is the work of the **RPCS3** and **RPCSX**
-teams; only the Android porting and adaptation happens here, with heavy AI assistance. If
-this build is useful to you, please honour these two things:
+This is **not original work**. [**RPCS3**](https://rpcs3.net/) is the PlayStation 3
+emulator for desktop (PC / laptop). The unofficial **RPCSX** group ported RPCS3 to Android,
+but that port fell behind and is now running an outdated RPCS3 base. What this project does
+is bring the **latest RPCS3 changes into the RPCSX Android app and core to update it**, with
+heavy AI assistance. If this build is useful to you, please honour these two things:
 
 ### 1. Donate to the teams who actually built the emulator
 Support them:
@@ -36,10 +38,11 @@ Updates here — and especially the work to merge newer
 expect rough edges.
 
 ### Why this exists
-Not to create yet another permanent fork. The goals are simply to **stay current**, and to
-**help the real RPCSX / RPCS3 teams** by demonstrating what can be done — they are welcome to
-take anything useful from here. All credit for the emulator and this UI belongs to the
-**RPCS3** and **RPCSX** developers.
+The RPCSX Android port is built on an older RPCS3 snapshot and had stopped tracking upstream,
+leaving Android a generation behind the desktop emulator. This project exists to **close that
+gap** — porting current RPCS3 fixes and features into the RPCSX Android app and core. It is
+not a permanent splinter fork: all credit for the emulator and the original UI belongs to the
+**RPCS3** and **RPCSX** developers, who are welcome to take anything useful from here.
 
 > Piracy is not permitted. Do not ask for games or system files.
 
