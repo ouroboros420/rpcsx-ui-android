@@ -16,3 +16,6 @@ local.properties
 .cache
 **/build*/
 .rx.version
+
+# local build logs
+build_*.log
