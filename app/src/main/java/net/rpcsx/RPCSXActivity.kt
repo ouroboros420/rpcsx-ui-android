@@ -158,8 +158,26 @@ class RPCSXActivity : ComponentActivity() {
         net.rpcsx.utils.ThermalManager.unregister()
         net.rpcsx.utils.AdpfManager.unregister()
         unregisterUsbEventListener()
-        bootThread?.interrupt()
-        bootThread?.join()
+        // Never block the UI thread here. The boot thread can be parked inside the
+        // blocking native RPCSX.boot() call (a first-boot PPU precompile runs for
+        // minutes); Thread.interrupt() cannot break a native JNI call, so joining it
+        // on the main thread froze the UI -> ANR ("Waited 5000ms for MotionEvent")
+        // when the user backed out of a still-compiling first boot and then touched
+        // the screen / recents. Both activities share this one main thread, so the
+        // stall surfaces as a MainActivity input-dispatch ANR.
+        //
+        // Signal the core to stop so the in-flight precompile aborts (Emu.Kill is
+        // idempotent and honored by the precompile's Emu.IsStopped() checks), then
+        // drain the boot thread on a detached worker so onDestroy returns at once.
+        val threadToDrain = bootThread
+        bootThread = null
+        if (threadToDrain != null) {
+            thread(isDaemon = true, name = "rpcsx-boot-drain") {
+                runCatching { RPCSX.instance.kill() }
+                threadToDrain.interrupt()
+                runCatching { threadToDrain.join() }
+            }
+        }
     }
 
 
