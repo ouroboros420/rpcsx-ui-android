@@ -235,6 +235,12 @@ fun ClankerThemesScreen(navigateBack: () -> Unit) {
 @Composable
 fun ClankerFeaturesScreen(navigateBack: () -> Unit) {
     ClankerScaffold(stringResource(R.string.clanker_features), navigateBack) { contentPadding ->
+        // Battery saver and GPU turbo are mutually exclusive (opposite power goals). Hoist both
+        // switch states to the screen scope so flipping one updates the OTHER switch's UI live,
+        // not just its backing store (otherwise the auto-disabled switch stayed visually on until
+        // the screen was reopened - the reported "didn't exclude each other visually").
+        var batterySaverOn by remember { mutableStateOf(PowerPolicy.enabled) }
+        var gpuTurboOn by remember { mutableStateOf(GpuTurbo.enabled) }
         LazyColumn(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             // Game tile layout (box-art covers) selector removed for now - the
             // cover feature is cut until remote loading is reliable on-device.
@@ -243,40 +249,40 @@ fun ClankerFeaturesScreen(navigateBack: () -> Unit) {
                 PreferenceHeader(text = stringResource(R.string.clanker_features_performance))
             }
             item(key = "battery_saver") {
-                var itemValue by remember { mutableStateOf(PowerPolicy.enabled) }
                 SwitchPreference(
-                    checked = itemValue,
+                    checked = batterySaverOn,
                     title = stringResource(R.string.clanker_battery_saver),
                     subtitle = { PreferenceSubtitle(text = stringResource(R.string.clanker_battery_saver_summary), maxLines = 3) },
                     leadingIcon = null,
                     onClick = { value ->
                         PowerPolicy.enabled = value
                         PowerPolicy.apply()
-                        // Mutually exclusive with GPU turbo (opposite power goals).
-                        if (value && GpuTurbo.enabled) {
+                        batterySaverOn = value
+                        // Mutually exclusive with GPU turbo: turning this on flips turbo off live.
+                        if (value && gpuTurboOn) {
                             GpuTurbo.enabled = false
                             GpuTurbo.apply()
+                            gpuTurboOn = false
                         }
-                        itemValue = value
                     }
                 )
             }
             item(key = "gpu_turbo") {
-                var itemValue by remember { mutableStateOf(GpuTurbo.enabled) }
                 SwitchPreference(
-                    checked = itemValue,
+                    checked = gpuTurboOn,
                     title = stringResource(R.string.clanker_gpu_turbo),
                     subtitle = { PreferenceSubtitle(text = stringResource(R.string.clanker_gpu_turbo_summary), maxLines = 4) },
                     leadingIcon = null,
                     onClick = { value ->
                         GpuTurbo.enabled = value
                         GpuTurbo.apply()
-                        // Mutually exclusive with battery saver (opposite power goals).
-                        if (value && PowerPolicy.enabled) {
+                        gpuTurboOn = value
+                        // Mutually exclusive with battery saver: turning this on flips saver off live.
+                        if (value && batterySaverOn) {
                             PowerPolicy.enabled = false
                             PowerPolicy.apply()
+                            batterySaverOn = false
                         }
-                        itemValue = value
                     }
                 )
             }
