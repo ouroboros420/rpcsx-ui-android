@@ -137,6 +137,9 @@ class MainActivity : ComponentActivity() {
                 net.rpcsx.utils.CompileThreadPolicy.apply(applicationContext)
                 // Android battery-saver (FIFO present + low SPU busy-wait); default on.
                 net.rpcsx.utils.PowerPolicy.apply()
+                // GPU turbo (max Adreno clocks); opt-in, default off, mutually exclusive with
+                // battery-saver.
+                net.rpcsx.utils.GpuTurbo.apply()
                 // Experimental: bias heavy threads to the big CPU cluster (default off).
                 runCatching {
                     RPCSX.instance.setCpuAffinityMode(GeneralSettings["cpu_affinity"] as? Boolean ?: false)

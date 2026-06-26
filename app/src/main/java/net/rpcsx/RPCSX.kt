@@ -120,6 +120,7 @@ class RPCSX {
     external fun customConfigSet(serial: String, path: String, value: String): Boolean
     external fun customConfigImport(serial: String, yaml: String): Boolean
     external fun setCustomDriver(path: String, libraryName: String, hookDir: String): Boolean
+    external fun setGpuTurbo(on: Boolean)
 
     // RPCN (community-PSN online play). All of these may block on network and
     // MUST be called off the main thread (Dispatchers.IO). The C++ side is

@@ -34,6 +34,7 @@ import net.rpcsx.ui.settings.components.preference.SwitchPreference
 import androidx.compose.ui.platform.LocalContext
 import net.rpcsx.utils.CompileThreadPolicy
 import net.rpcsx.utils.GameViewTheme
+import net.rpcsx.utils.GpuTurbo
 import net.rpcsx.utils.PowerPolicy
 import net.rpcsx.utils.GeneralSettings
 
@@ -251,6 +252,30 @@ fun ClankerFeaturesScreen(navigateBack: () -> Unit) {
                     onClick = { value ->
                         PowerPolicy.enabled = value
                         PowerPolicy.apply()
+                        // Mutually exclusive with GPU turbo (opposite power goals).
+                        if (value && GpuTurbo.enabled) {
+                            GpuTurbo.enabled = false
+                            GpuTurbo.apply()
+                        }
+                        itemValue = value
+                    }
+                )
+            }
+            item(key = "gpu_turbo") {
+                var itemValue by remember { mutableStateOf(GpuTurbo.enabled) }
+                SwitchPreference(
+                    checked = itemValue,
+                    title = stringResource(R.string.clanker_gpu_turbo),
+                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.clanker_gpu_turbo_summary), maxLines = 4) },
+                    leadingIcon = null,
+                    onClick = { value ->
+                        GpuTurbo.enabled = value
+                        GpuTurbo.apply()
+                        // Mutually exclusive with battery saver (opposite power goals).
+                        if (value && PowerPolicy.enabled) {
+                            PowerPolicy.enabled = false
+                            PowerPolicy.apply()
+                        }
                         itemValue = value
                     }
                 )

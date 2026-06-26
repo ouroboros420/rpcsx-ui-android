@@ -559,6 +559,16 @@ Java_net_rpcsx_RPCSX_getVersion(JNIEnv *env, jobject) {
   return wrap(env, rpcsxLib.getVersion());
 }
 
+// Opt-in GPU turbo (Clanker Settings, default off): force max Adreno clocks via adrenotools'
+// KGSL ioctl. adrenotools_set_turbo opens /dev/kgsl-3d0 itself and no-ops silently on non-Adreno
+// or if the fd open fails, so it is always safe; statically linked from libadrenotools.
+extern "C" JNIEXPORT void JNICALL
+Java_net_rpcsx_RPCSX_setGpuTurbo(JNIEnv *, jobject, jboolean on) {
+#ifdef __aarch64__
+  adrenotools_set_turbo(on == JNI_TRUE);
+#endif
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_net_rpcsx_RPCSX_setCustomDriver(JNIEnv *env, jobject, jstring jpath,
                                      jstring jlibraryName, jstring jhookDir) {

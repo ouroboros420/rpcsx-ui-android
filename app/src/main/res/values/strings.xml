@@ -138,6 +138,8 @@
     <string name="clanker_cpu_affinity_summary">Pins the heavy emulation threads to the fast CPU cores, freeing the efficiency cores. May reduce heat - or cost FPS on some games. Test it; turn off if anything runs worse.</string>
     <string name="clanker_battery_saver">Battery saver</string>
     <string name="clanker_battery_saver_summary">Cuts power and heat: caps the GPU to the display refresh and lets idle SPU cores sleep instead of spinning. Recommended for handhelds. Turn off if you notice a frame-rate drop.</string>
+    <string name="clanker_gpu_turbo">GPU turbo (max clocks)</string>
+    <string name="clanker_gpu_turbo_summary">Forces the GPU to its highest clocks (disables power scaling) to remove ramp-up stutter in demanding scenes. Increases heat and battery use; not recommended with Battery saver. Adreno only.</string>
     <string name="clanker_auto_threads">Auto-limit compile threads (low RAM)</string>
     <string name="clanker_auto_threads_summary">Caps how many game modules compile at once so low-memory devices don\'t run out of memory and close during first-boot compilation. This device: %1$s. No effect on high-memory devices.</string>
     <string name="clanker_auto_threads_all">all cores</string>
