@@ -211,6 +211,14 @@
     <string name="gamepad_overlay">Gamepad Overlay</string>
     <string name="install_custom_rpcsx_lib">Install Custom RPCSX Library</string>
     <string name="key_mappings">Key Mappings</string>
+    <string name="analog_triggers_header">Analog Triggers</string>
+    <string name="analog_triggers">Analog L2/R2 (pressure)</string>
+    <string name="analog_triggers_summary">Send how far the L2/R2 triggers are pulled (0-255) instead of on/off. Only affects controllers with analog triggers; trigger buttons still work as digital presses otherwise.</string>
+    <string name="analog_triggers_deadzone">Trigger deadzone</string>
+    <string name="analog_triggers_curve">Trigger response curve</string>
+    <string name="analog_triggers_curve_summary">100 % = linear. Higher values give finer control over the first part of the pull (useful for short handheld triggers).</string>
+    <string name="analog_triggers_test">Trigger test</string>
+    <string name="analog_triggers_test_idle">Pull a trigger on your controller to see its value</string>
     <string name="log_not_found">Log file not found!</string>
     <string name="manage_settings">Manage Settings</string>
     <string name="no_activity_to_handle_action">No activity found to handle this action</string>

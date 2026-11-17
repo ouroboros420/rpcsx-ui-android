@@ -18,6 +18,11 @@
 struct RPCSXApi {
   bool (*overlayPadData)(int digital1, int digital2, int leftStickX,
                          int leftStickY, int rightStickX, int rightStickY);
+  // Optional (newer cores only): overlayPadData plus L2/R2 pressure 0-255
+  // (-1 = derive from the digital bit, as overlayPadData does).
+  bool (*overlayPadDataEx)(int digital1, int digital2, int leftStickX,
+                           int leftStickY, int rightStickX, int rightStickY,
+                           int l2Pressure, int r2Pressure);
   bool (*initialize)(std::string_view rootDir, std::string_view user);
   // Additive, optional: may be null when running against an older core .so.
   void (*setRpcnConfigDir)(std::string_view internalDir);
@@ -121,6 +126,7 @@ struct RPCSXLibrary : RPCSXApi {
 
     // clang-format off
     result.overlayPadData = reinterpret_cast<decltype(overlayPadData)>(dlsym(handle, "_rpcsx_overlayPadData"));
+    result.overlayPadDataEx = reinterpret_cast<decltype(overlayPadDataEx)>(dlsym(handle, "_rpcsx_overlayPadDataEx"));
     result.initialize = reinterpret_cast<decltype(initialize)>(dlsym(handle, "_rpcsx_initialize"));
     result.setRpcnConfigDir = reinterpret_cast<decltype(setRpcnConfigDir)>(dlsym(handle, "_rpcsx_setRpcnConfigDir"));
     result.processCompilationQueue = reinterpret_cast<decltype(processCompilationQueue)>(dlsym(handle, "_rpcsx_processCompilationQueue"));
@@ -228,6 +234,20 @@ Java_net_rpcsx_RPCSX_getLibraryVersion(JNIEnv *env, jobject, jstring path) {
 extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_overlayPadData(
     JNIEnv *, jobject, jint digital1, jint digital2, jint leftStickX,
     jint leftStickY, jint rightStickX, jint rightStickY) {
+  return rpcsxLib.overlayPadData(digital1, digital2, leftStickX, leftStickY,
+                                 rightStickX, rightStickY);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcsx_RPCSX_overlayPadDataEx(
+    JNIEnv *, jobject, jint digital1, jint digital2, jint leftStickX,
+    jint leftStickY, jint rightStickX, jint rightStickY, jint l2Pressure,
+    jint r2Pressure) {
+  // Optional: older cores lack the symbol and get digital-only triggers.
+  if (rpcsxLib.overlayPadDataEx) {
+    return rpcsxLib.overlayPadDataEx(digital1, digital2, leftStickX, leftStickY,
+                                     rightStickX, rightStickY, l2Pressure,
+                                     r2Pressure);
+  }
   return rpcsxLib.overlayPadData(digital1, digital2, leftStickX, leftStickY,
                                  rightStickX, rightStickY);
 }

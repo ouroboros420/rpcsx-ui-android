@@ -91,6 +91,9 @@ class RPCSX {
     external fun processCompilationQueue(): Boolean
     external fun startMainThreadProcessor(): Boolean
     external fun overlayPadData(digital1: Int, digital2: Int, leftStickX: Int, leftStickY: Int, rightStickX: Int, rightStickY: Int): Boolean
+    // overlayPadData plus L2/R2 pressure (0-255, -1 = derive from the digital bit). On a core
+    // without _rpcsx_overlayPadDataEx the bridge falls back to overlayPadData (digital triggers).
+    external fun overlayPadDataEx(digital1: Int, digital2: Int, leftStickX: Int, leftStickY: Int, rightStickX: Int, rightStickY: Int, l2Pressure: Int, r2Pressure: Int): Boolean
     external fun collectGameInfo(rootDir: String, progressId: Long): Boolean
     external fun systemInfo(): String
     external fun settingsGet(path: String): String

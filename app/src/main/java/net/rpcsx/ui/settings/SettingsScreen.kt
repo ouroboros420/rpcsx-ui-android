@@ -5,6 +5,8 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -56,6 +59,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,6 +72,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +82,7 @@ import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import net.rpcsx.ui.settings.components.core.PreferenceHeader
 import net.rpcsx.ui.settings.components.core.PreferenceIcon
+import net.rpcsx.ui.settings.components.core.PreferenceSubtitle
 import net.rpcsx.ui.settings.components.core.PreferenceValue
 import net.rpcsx.ui.settings.components.preference.HomePreference
 import net.rpcsx.ui.settings.components.preference.HomeSwitchPreference
@@ -93,6 +99,7 @@ import net.rpcsx.UserRepository
 import net.rpcsx.dialogs.AlertDialogQueue
 import net.rpcsx.provider.AppDataDocumentProvider
 import net.rpcsx.ui.common.ComposePreview
+import net.rpcsx.utils.AnalogTriggerConfig
 import net.rpcsx.utils.FileUtil
 import net.rpcsx.utils.GeneralSettings
 import net.rpcsx.utils.InputBindingPrefs
@@ -840,6 +847,34 @@ fun ControllerSettings(
         var currentInputName by remember { mutableStateOf("") }
         val requester = remember { FocusRequester() }
 
+        var analogTriggers by remember {
+            mutableStateOf(GeneralSettings[AnalogTriggerConfig.KEY_ENABLED] as? Boolean ?: AnalogTriggerConfig.DEFAULT_ENABLED)
+        }
+        var triggerDeadzone by remember {
+            mutableStateOf(GeneralSettings[AnalogTriggerConfig.KEY_DEADZONE] as? Int ?: AnalogTriggerConfig.DEFAULT_DEADZONE)
+        }
+        var triggerCurve by remember {
+            mutableStateOf(GeneralSettings[AnalogTriggerConfig.KEY_CURVE] as? Int ?: AnalogTriggerConfig.DEFAULT_CURVE)
+        }
+        var triggerAxes by remember { mutableStateOf<TriggerAxes?>(null) }
+        ListenTriggerAxes { triggerAxes = it }
+
+        // Bind the pressed key (or trigger, see onTriggerAxis) to the row being edited.
+        fun bindCurrentInput(keyCode: Int) {
+            if (inputBindings.containsKey(keyCode)) {
+                inputBindings[keyCode]?.let { value ->
+                    inputBindings.remove(keyCode)
+                    inputBindings[(10000..99999).random()] = value
+                }
+            }
+            inputBindings[currentInput]?.let { value ->
+                inputBindings.remove(currentInput)
+                inputBindings[keyCode] = value
+            }
+            InputBindingPrefs.saveBindings(inputBindings.toMap())
+            showDialog = false
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -871,6 +906,79 @@ fun ControllerSettings(
                 )
             }
 
+
+            item {
+                PreferenceHeader(stringResource(R.string.analog_triggers_header))
+            }
+
+            item {
+                SwitchPreference(
+                    checked = analogTriggers,
+                    title = stringResource(R.string.analog_triggers) + if (analogTriggers == AnalogTriggerConfig.DEFAULT_ENABLED) "" else " *",
+                    subtitle = { PreferenceSubtitle(text = stringResource(R.string.analog_triggers_summary), maxLines = 3) },
+                    leadingIcon = null,
+                    onClick = { value ->
+                        GeneralSettings.setValue(AnalogTriggerConfig.KEY_ENABLED, value)
+                        analogTriggers = value
+                    }
+                )
+            }
+
+            item {
+                SliderPreference(
+                    value = triggerDeadzone.toFloat(),
+                    onValueChange = {
+                        triggerDeadzone = it.toInt()
+                        GeneralSettings.setValue(AnalogTriggerConfig.KEY_DEADZONE, triggerDeadzone)
+                    },
+                    title = stringResource(R.string.analog_triggers_deadzone),
+                    enabled = analogTriggers,
+                    valueRange = 0f..AnalogTriggerConfig.MAX_DEADZONE.toFloat(),
+                    valueContent = { PreferenceValue("$triggerDeadzone %") }
+                )
+            }
+
+            item {
+                SliderPreference(
+                    value = triggerCurve.toFloat(),
+                    onValueChange = {
+                        triggerCurve = it.toInt()
+                        GeneralSettings.setValue(AnalogTriggerConfig.KEY_CURVE, triggerCurve)
+                    },
+                    title = stringResource(R.string.analog_triggers_curve),
+                    subtitle = stringResource(R.string.analog_triggers_curve_summary),
+                    enabled = analogTriggers,
+                    valueRange = AnalogTriggerConfig.MIN_CURVE.toFloat()..AnalogTriggerConfig.MAX_CURVE.toFloat(),
+                    valueContent = { PreferenceValue("$triggerCurve %") }
+                )
+            }
+
+            item {
+                // Live readout so users can check whether their pad has analog triggers at all.
+                val config = AnalogTriggerConfig(analogTriggers, triggerDeadzone, triggerCurve)
+                fun side(axes: TriggerAxes, left: Boolean): String {
+                    val raw = if (left) maxOf(axes.lTrigger, axes.brake) else maxOf(axes.rTrigger, axes.gas)
+                    val source = when {
+                        left && axes.lTrigger > 0f -> "LTRIGGER"
+                        left && axes.brake > 0f -> "BRAKE"
+                        !left && axes.rTrigger > 0f -> "RTRIGGER"
+                        !left && axes.gas > 0f -> "GAS"
+                        else -> "-"
+                    }
+                    return "${(raw * 100).toInt()}% ($source) -> ${config.axisToPressure(raw)}"
+                }
+                RegularPreference(
+                    title = stringResource(R.string.analog_triggers_test),
+                    subtitle = {
+                        PreferenceSubtitle(
+                            text = triggerAxes?.let { "L2: ${side(it, true)}\nR2: ${side(it, false)}" }
+                                ?: stringResource(R.string.analog_triggers_test_idle),
+                            maxLines = 2
+                        )
+                    },
+                    onClick = {}
+                )
+            }
 
             item {
                 PreferenceHeader(stringResource(R.string.key_mappings))
@@ -930,22 +1038,15 @@ fun ControllerSettings(
                     }
                 },
                 onDismissRequest = { showDialog = false },
+                // A trigger that only reports an axis (no key event) binds as its trigger key:
+                // the in-game handler reads LTRIGGER/BRAKE with KEYCODE_BUTTON_L2 and
+                // RTRIGGER/GAS with KEYCODE_BUTTON_R2.
+                onTriggerAxis = { keyCode -> if (showDialog) bindCurrentInput(keyCode) },
                 modifier = Modifier
                     .onKeyEvent { keyEvent ->
                         if (keyEvent.type == KeyEventType.KeyDown) {
                             if (showDialog) {
-                                if (inputBindings.containsKey(keyEvent.nativeKeyEvent.keyCode)) {
-                                    inputBindings[keyEvent.nativeKeyEvent.keyCode]?.let { value ->
-                                        inputBindings.remove(keyEvent.nativeKeyEvent.keyCode)
-                                        inputBindings[(10000..99999).random()] = value
-                                    }
-                                }
-                                inputBindings[currentInput]?.let { value ->
-                                    inputBindings.remove(currentInput)
-                                    inputBindings[keyEvent.nativeKeyEvent.keyCode] = value
-                                }
-                                InputBindingPrefs.saveBindings(inputBindings.toMap())
-                                showDialog = false
+                                bindCurrentInput(keyEvent.nativeKeyEvent.keyCode)
                                 true
                             } else false
                         } else false
@@ -967,11 +1068,24 @@ fun ControllerSettings(
 fun InputBindingDialog(
     modifier: Modifier = Modifier,
     onReset: () -> Unit = {},
+    onTriggerAxis: (keyCode: Int) -> Unit = {},
     onDismissRequest: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismissRequest
     ) {
+        // The sheet is its own window, so listen on its view. Fire once per pull, past half travel.
+        var triggerArmed by remember { mutableStateOf(true) }
+        ListenTriggerAxes { axes ->
+            val left = maxOf(axes.lTrigger, axes.brake)
+            val right = maxOf(axes.rTrigger, axes.gas)
+            if (!triggerArmed) {
+                triggerArmed = left < 0.2f && right < 0.2f
+            } else if (left > 0.5f || right > 0.5f) {
+                triggerArmed = false
+                onTriggerAxis(if (left >= right) KeyEvent.KEYCODE_BUTTON_L2 else KeyEvent.KEYCODE_BUTTON_R2)
+            }
+        }
         Column(
             modifier = modifier
                 .fillMaxWidth()
@@ -1002,6 +1116,35 @@ fun InputBindingDialog(
                 Text(stringResource(R.string.reset))
             }
         }
+    }
+}
+
+/** Raw analog trigger axes of a gamepad MotionEvent (0..1). */
+data class TriggerAxes(val lTrigger: Float, val rTrigger: Float, val brake: Float, val gas: Float)
+
+/**
+ * Report gamepad trigger axes delivered to the current window's view. Joystick motion goes to
+ * the focused view, which in Compose is the host view itself.
+ */
+@Composable
+fun ListenTriggerAxes(onAxes: (TriggerAxes) -> Unit) {
+    val view = LocalView.current
+    val currentOnAxes by rememberUpdatedState(onAxes)
+    DisposableEffect(view) {
+        view.setOnGenericMotionListener { _: View, event: MotionEvent ->
+            if (event.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK) && event.action == MotionEvent.ACTION_MOVE) {
+                currentOnAxes(
+                    TriggerAxes(
+                        lTrigger = event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
+                        rTrigger = event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
+                        brake = event.getAxisValue(MotionEvent.AXIS_BRAKE),
+                        gas = event.getAxisValue(MotionEvent.AXIS_GAS),
+                    )
+                )
+            }
+            false // never consume: sticks/dpad keep working for navigation
+        }
+        onDispose { view.setOnGenericMotionListener(null) }
     }
 }
 

@@ -24,8 +24,10 @@ import androidx.core.view.updateLayoutParams
 import net.rpcsx.databinding.ActivityRpcs3Binding
 import net.rpcsx.dialogs.AlertDialogQueue
 import net.rpcsx.overlay.State
+import net.rpcsx.utils.AnalogTriggerConfig
 import net.rpcsx.utils.GeneralSettings
 import net.rpcsx.utils.InputBindingPrefs
+import net.rpcsx.utils.TriggerArbiter
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
@@ -33,10 +35,16 @@ class RPCSXActivity : ComponentActivity() {
     private lateinit var binding: ActivityRpcs3Binding
     private lateinit var unregisterUsbEventListener: () -> Unit
     private var gamePadState: State = State()
-    private var usesAxisL2 = false
-    private var usesAxisR2 = false
     private var bootThread: Thread? = null
     private val inputBindings by lazy { InputBindingPrefs.loadBindings() }
+
+    // Physical triggers: index 0 = left (KEYCODE_BUTTON_L2 + AXIS_LTRIGGER/AXIS_BRAKE),
+    // 1 = right (KEYCODE_BUTTON_R2 + AXIS_RTRIGGER/AXIS_GAS). Each drives whatever PS3 button
+    // its trigger key is bound to in Key Mappings (L2/R2 by default).
+    private val triggerConfig by lazy { AnalogTriggerConfig.load() }
+    private val triggerArbiters = arrayOf(TriggerArbiter(), TriggerArbiter())
+    private var l2Pressure = -1
+    private var r2Pressure = -1
 
     private companion object {
         // Game-reference string-extra keys accepted from external frontends, in priority order:
@@ -285,22 +293,70 @@ class RPCSXActivity : ComponentActivity() {
     }
 
 
-    private fun keyCodeToPadBit(keyCode: Int): Pair<Int, Int> {
-        val event = inputBindings[keyCode] ?: Pair(0, 0)
-        
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
-            if (usesAxisR2) return Pair(0, 0) else return event
+    private fun keyCodeToPadBit(keyCode: Int): Pair<Int, Int> =
+        inputBindings[keyCode] ?: Pair(0, 0)
+
+    private fun triggerSide(keyCode: Int): Int = when (keyCode) {
+        KeyEvent.KEYCODE_BUTTON_L2 -> 0
+        KeyEvent.KEYCODE_BUTTON_R2 -> 1
+        else -> -1
+    }
+
+    /**
+     * Fold both physical triggers into the pad state: digital bit of each trigger's bound PS3
+     * button, plus the L2/R2 pressure values (-1 = "no analog value, use the digital bit").
+     */
+    private fun applyTriggers() {
+        val clearMask = IntArray(2)
+        val setMask = IntArray(2)
+        var l2 = -1
+        var r2 = -1
+
+        for (side in 0..1) {
+            val (bit, index) = keyCodeToPadBit(
+                if (side == 0) KeyEvent.KEYCODE_BUTTON_L2 else KeyEvent.KEYCODE_BUTTON_R2
+            )
+            if (bit == 0 || index !in 0..1) continue
+            val pressure = triggerArbiters[side].pressure
+            clearMask[index] = clearMask[index] or bit
+            if (pressure > 0) setMask[index] = setMask[index] or bit
+
+            if (triggerConfig.enabled && index == 1) {
+                when (bit) {
+                    Digital2Flags.CELL_PAD_CTRL_L2.bit -> l2 = maxOf(l2, pressure)
+                    Digital2Flags.CELL_PAD_CTRL_R2.bit -> r2 = maxOf(r2, pressure)
+                }
+            }
         }
-        
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_L2) {
-            if (usesAxisL2) return Pair(0, 0) else return event
+
+        for (index in 0..1) {
+            gamePadState.digital[index] =
+                (gamePadState.digital[index] and clearMask[index].inv()) or setMask[index]
         }
-        
-        return event
+        l2Pressure = l2
+        r2Pressure = r2
+    }
+
+    private fun isGamepadKey(event: KeyEvent?): Boolean =
+        event != null && (event.source and (InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK or InputDevice.SOURCE_DPAD)) != 0
+
+    private fun onTriggerKey(side: Int, down: Boolean, event: KeyEvent): Boolean {
+        triggerArbiters[side].onKey(down, event.eventTime)
+        applyTriggers()
+        sendGamepadData()
+        return true
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event == null || (event.source and (InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK or InputDevice.SOURCE_DPAD)) == 0 || event.repeatCount != 0) {
+        if (!isGamepadKey(event)) {
+            return super.onKeyDown(keyCode, event)
+        }
+        val side = triggerSide(keyCode)
+        if (side >= 0 && keyCodeToPadBit(keyCode).first != 0) {
+            // Repeats are swallowed by the arbiter; consume them so they can't leak to the UI.
+            return onTriggerKey(side, true, event!!)
+        }
+        if (event!!.repeatCount != 0) {
             return super.onKeyDown(keyCode, event)
         }
         val padBit = keyCodeToPadBit(keyCode)
@@ -314,8 +370,12 @@ class RPCSXActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event == null || event.source and (InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK or InputDevice.SOURCE_DPAD) == 0) {
+        if (!isGamepadKey(event)) {
             return super.onKeyUp(keyCode, event)
+        }
+        val side = triggerSide(keyCode)
+        if (side >= 0 && keyCodeToPadBit(keyCode).first != 0) {
+            return onTriggerKey(side, false, event!!)
         }
 
         val padBit = keyCodeToPadBit(keyCode)
@@ -334,25 +394,12 @@ class RPCSXActivity : ComponentActivity() {
             return super.onGenericMotionEvent(event)
         }
 
-        if (event.getAxisValue(MotionEvent.AXIS_LTRIGGER) > 0.1) {
-            gamePadState.digital[1] =
-                gamePadState.digital[1] or Digital2Flags.CELL_PAD_CTRL_L2.bit
-            usesAxisL2 = true
-        } else if (usesAxisL2) {
-            usesAxisL2 = false
-            gamePadState.digital[1] =
-                gamePadState.digital[1] and Digital2Flags.CELL_PAD_CTRL_L2.bit.inv()
-        }
-
-        if (event.getAxisValue(MotionEvent.AXIS_RTRIGGER) > 0.1) {
-            gamePadState.digital[1] =
-                gamePadState.digital[1] or Digital2Flags.CELL_PAD_CTRL_R2.bit
-            usesAxisR2 = true
-        } else if (usesAxisR2) {
-            usesAxisR2 = false
-            gamePadState.digital[1] =
-                gamePadState.digital[1] and Digital2Flags.CELL_PAD_CTRL_R2.bit.inv()
-        }
+        // Pads report triggers as LTRIGGER/RTRIGGER, BRAKE/GAS, or both: take the larger.
+        val leftRaw = maxOf(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE))
+        val rightRaw = maxOf(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS))
+        triggerArbiters[0].onAxis(triggerConfig.axisToPressure(leftRaw), event.eventTime)
+        triggerArbiters[1].onAxis(triggerConfig.axisToPressure(rightRaw), event.eventTime)
+        applyTriggers()
 
         val dpadX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
         val dpadY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
@@ -389,13 +436,15 @@ class RPCSXActivity : ComponentActivity() {
     }
 
     private fun sendGamepadData() {
-        RPCSX.instance.overlayPadData(
+        RPCSX.instance.overlayPadDataEx(
             gamePadState.digital[0],
             gamePadState.digital[1],
             gamePadState.leftStickX,
             gamePadState.leftStickY,
             gamePadState.rightStickX,
-            gamePadState.rightStickY
+            gamePadState.rightStickY,
+            l2Pressure,
+            r2Pressure
         )
     }
 
